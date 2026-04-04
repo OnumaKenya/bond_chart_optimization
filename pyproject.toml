@@ -1,0 +1,18 @@
+[project]
+name = "bond-chart-optimization"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "dash>=4.1.0",
+    "gunicorn>=23.0.0",
+    "numpy>=2.0.0",
+    "plotly>=6.6.0",
+]
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.19.0",
+    "pytest>=9.0.2",
+]
