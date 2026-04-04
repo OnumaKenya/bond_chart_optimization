@@ -310,6 +310,13 @@ def summarize_path(path: list[tuple[int, ...]], costume_names: list[str]) -> lis
         else:
             names = [costume_names[c] for c in pattern]
             rotating = "→".join(names)
+            total_steps = end - start
+            full_repeats = total_steps // len(pattern)
+            remainder = total_steps % len(pattern)
+            if remainder == 0:
+                count_str = f"x {full_repeats}"
+            else:
+                count_str = f"x {full_repeats}+{remainder}"
             parts = []
             for c in dict.fromkeys(pattern):
                 if from_state[c] != to_state[c]:
@@ -317,7 +324,7 @@ def summarize_path(path: list[tuple[int, ...]], costume_names: list[str]) -> lis
                         parts.append(f"{costume_names[c]} {to_state[c]}")
                     else:
                         parts.append(f"{costume_names[c]} {from_state[c]} → {to_state[c]}")
-            desc = f"[{rotating}] " + ", ".join(parts)
+            desc = f"[{rotating}] {count_str} " + ", ".join(parts)
 
         summary.append({"description": desc, "from": from_state, "to": to_state})
 

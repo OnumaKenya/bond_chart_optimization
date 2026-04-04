@@ -290,6 +290,12 @@ function _solver_summarizePath(path, costumeNames) {
                 return costumeNames[c];
             });
             var rotating = names.join("\u2192");
+            var totalSteps = end - start;
+            var fullRepeats = Math.floor(totalSteps / pat.length);
+            var remainder = totalSteps % pat.length;
+            var countStr = remainder === 0
+                ? "x " + fullRepeats
+                : "x " + fullRepeats + "+" + remainder;
             var parts = [];
             var seen = {};
             for (var pi = 0; pi < pat.length; pi++) {
@@ -310,7 +316,7 @@ function _solver_summarizePath(path, costumeNames) {
                     }
                 }
             }
-            desc = "[" + rotating + "] " + parts.join(", ");
+            desc = "[" + rotating + "] " + countStr + " " + parts.join(", ");
         }
 
         summary.push({ description: desc, from: fromState, to: toState });
