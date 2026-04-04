@@ -16,4 +16,5 @@ app = Dash(
     title="絆上げ優先度計算機",
     update_title=None,
     external_scripts=["https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"],
+    meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}],
 )

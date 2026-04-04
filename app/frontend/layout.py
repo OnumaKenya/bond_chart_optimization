@@ -80,6 +80,7 @@ def make_student_card(
             # 絆ボーナス入力行
             html.Div(
                 bond_fields,
+                className="bond-fields",
                 style={"display": "flex", "gap": "8px", "flexWrap": "wrap"},
             ),
         ],
@@ -144,6 +145,7 @@ def create_layout() -> html.Div:
                         style={"marginLeft": "auto", "display": "flex", "alignItems": "center", "gap": "12px"},
                     ),
                 ],
+                className="page-header",
                 style={"display": "flex", "alignItems": "center", "marginBottom": "16px"},
             ),
             # マニュアルモーダル
@@ -221,6 +223,7 @@ def create_layout() -> html.Div:
                                 },
                             ),
                         ],
+                        className="sidebar",
                         style={
                             "width": "220px",
                             "flexShrink": "0",
@@ -250,6 +253,7 @@ def create_layout() -> html.Div:
                                     html.Div(
                                         id="bond-rank-container",
                                         children=[_make_bond_rank_input(0)],
+                                        className="bond-rank-row",
                                         style={"display": "flex", "gap": "8px", "flexWrap": "wrap"},
                                     ),
                                 ],
@@ -279,11 +283,12 @@ def create_layout() -> html.Div:
                                 },
                             ),
                             # 計算結果表示エリア
-                            html.Div(id="chart-result", style={"marginTop": "16px"}),
+                            html.Div(id="chart-result", className="chart-result-area", style={"marginTop": "16px"}),
                         ],
                         style={"flex": "1", "minWidth": "0"},
                     ),
                 ],
+                className="main-columns",
                 style={"display": "flex", "gap": "20px", "alignItems": "flex-start"},
             ),
             # 非表示 Store 群
@@ -291,5 +296,6 @@ def create_layout() -> html.Div:
             dcc.Store(id="next-student-index", data=1),
             dcc.Store(id="solver-inputs"),
         ],
+        className="page-container",
         style={"maxWidth": "1200px", "margin": "0 auto", "padding": "20px", "fontFamily": "sans-serif"},
     )

@@ -60,3 +60,51 @@ input[type="number"] {
 @keyframes solver-spin {
     to { transform: rotate(360deg); }
 }
+
+/* ── モバイル対応 ── */
+@media (max-width: 768px) {
+    /* 2カラム → 縦積み */
+    .main-columns {
+        flex-direction: column !important;
+        gap: 12px !important;
+    }
+
+    /* サイドバーを横幅いっぱいに */
+    .sidebar {
+        width: 100% !important;
+        position: static !important;
+    }
+
+    /* ページ全体のパディングを縮小 */
+    .page-container {
+        padding: 12px !important;
+    }
+
+    /* ヘッダー行 */
+    .page-header {
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+    }
+    .page-header h1 {
+        font-size: 1.3rem !important;
+    }
+
+    /* 衣装カード内の絆入力を2列に */
+    .bond-fields {
+        gap: 6px !important;
+    }
+    .bond-fields > div {
+        min-width: 60px !important;
+    }
+
+    /* 絆ランク入力行 */
+    .bond-rank-row {
+        gap: 6px !important;
+    }
+
+    /* 結果テーブルの横スクロール */
+    .chart-result-area {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+}
