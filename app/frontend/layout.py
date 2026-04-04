@@ -220,29 +220,6 @@ def create_layout() -> html.Div:
                                     "background": "#f5f5ff",
                                 },
                             ),
-                            # ソルバー選択
-                            html.Div(
-                                [
-                                    html.Strong("ソルバー"),
-                                    dcc.Dropdown(
-                                        id="solver-type",
-                                        options=[
-                                            {"label": "DP (4衣装以下)", "value": "dp"},
-                                            {"label": "ビームサーチ(5衣装以上)", "value": "chokudai"},
-                                        ],
-                                        value="dp",
-                                        clearable=False,
-                                        style={"marginTop": "6px"},
-                                    ),
-                                ],
-                                style={
-                                    "padding": "10px",
-                                    "border": "1px solid #ddd",
-                                    "borderRadius": "8px",
-                                    "background": "#f5f5ff",
-                                    "marginTop": "12px",
-                                },
-                            ),
                         ],
                         style={
                             "width": "220px",

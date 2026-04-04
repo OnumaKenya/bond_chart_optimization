@@ -1,7 +1,7 @@
 /**
- * クライアントサイド DP ソルバー
+ * クライアントサイド Sidney 分解ソルバー
  *
- * Python の chart_solver.py を JavaScript に移植したもの。
+ * Python の chart_solver.py (solve_sidney) を JavaScript に移植したもの。
  * Dash の clientside_callback として登録される。
  */
 
@@ -59,123 +59,88 @@ function _solver_cumulativeBonus(bondBonuses) {
     return cum;
 }
 
-function _solver_getBonus(state, cumPerCostume) {
-    var total = 0;
-    for (var i = 0; i < state.length; i++) {
-        total += cumPerCostume[i][state[i]];
-    }
-    return total;
-}
-
 /* ------------------------------------------------------------------ */
-/*  DP ソルバー                                                        */
+/*  Sidney 分解ソルバー                                                 */
 /* ------------------------------------------------------------------ */
 
-function _solver_isBetterTie(stateKey, nextKey, movedCostume, state, dpMoved, dpPre) {
-    var oldMoved = dpMoved.get(nextKey);
-    if (oldMoved === undefined || oldMoved < 0) return true;
-
-    var prevMoved = dpMoved.get(stateKey);
-
-    // 1. 連続優先
-    var newContinues = (movedCostume === prevMoved);
-    var oldContinues = (oldMoved === prevMoved);
-    if (newContinues !== oldContinues) return newContinues;
-
-    // 2. バランス優先
-    var newRank = state[movedCostume];
-    var oldSrcKey = dpPre.get(nextKey);
-    var oldRank = 50;
-    if (oldSrcKey !== undefined) {
-        var parts = oldSrcKey.split(",");
-        oldRank = parseInt(parts[oldMoved], 10);
-    }
-    if (newRank !== oldRank) return newRank < oldRank;
-
-    // 3. 固定順序
-    return movedCostume < oldMoved;
-}
-
-function _solver_solve(currentRanks, allBondBonuses) {
+/**
+ * Sidney 分解により最適な絆上げ順序を O(T log T) で計算する。
+ *
+ * @param {number[]} currentRanks - 各衣装の現在ランク
+ * @param {number[][]} allBondBonuses - 各衣装の bond_bonuses (長さ7)
+ * @returns {{ path: number[][], totalScore: number }}
+ */
+function _solver_solveSidney(currentRanks, allBondBonuses) {
     var n = currentRanks.length;
     var cumPerCostume = allBondBonuses.map(function (bb) {
         return _solver_cumulativeBonus(bb);
     });
 
-    var dp = new Map();
-    var dpPre = new Map();
-    var dpMoved = new Map();
+    // 各衣装のジョブチェーンを構築し Sidney 分解
+    // ブロック: { p: number, w: number, jobs: {ci, r}[] }
+    var allBlocks = [];
 
-    var initialKey = currentRanks.join(",");
-    dp.set(initialKey, 0);
+    for (var ci = 0; ci < n; ci++) {
+        var stack = []; // { p, w, jobs }
+        for (var r = currentRanks[ci]; r < 50; r++) {
+            var w = _solver_BOND_EXP_PER_LEVEL[r - 1];
+            var p = cumPerCostume[ci][r + 1] - cumPerCostume[ci][r];
+            var newBlock = { p: p, w: w, jobs: [{ ci: ci, r: r }] };
 
-    // 全状態を辞書順に列挙 (itertools.product 相当)
-    var state = currentRanks.slice();
-
-    while (true) {
-        var key = state.join(",");
-        var val = dp.get(key);
-
-        if (val !== undefined) {
-            var bonus = _solver_getBonus(state, cumPerCostume);
-
-            for (var i = 0; i < n; i++) {
-                if (state[i] >= 50) continue;
-
-                var exp = _solver_BOND_EXP_PER_LEVEL[state[i] - 1];
-                var newVal = val + exp * bonus;
-
-                state[i]++;
-                var nextKey = state.join(",");
-                state[i]--;
-
-                var oldVal = dp.get(nextKey);
-                if (
-                    oldVal === undefined ||
-                    newVal > oldVal ||
-                    (newVal === oldVal &&
-                        _solver_isBetterTie(key, nextKey, i, state, dpMoved, dpPre))
-                ) {
-                    dp.set(nextKey, newVal);
-                    dpPre.set(nextKey, key);
-                    dpMoved.set(nextKey, i);
+            // top の p/w < new の p/w ならマージ (整数比較で除算回避)
+            while (stack.length > 0) {
+                var top = stack[stack.length - 1];
+                if (top.p * newBlock.w < newBlock.p * top.w) {
+                    stack.pop();
+                    newBlock = {
+                        p: top.p + newBlock.p,
+                        w: top.w + newBlock.w,
+                        jobs: top.jobs.concat(newBlock.jobs),
+                    };
+                } else {
+                    break;
                 }
             }
+            stack.push(newBlock);
         }
-
-        // オドメーター式インクリメント
-        var dim = n - 1;
-        while (dim >= 0) {
-            state[dim]++;
-            if (state[dim] <= 50) break;
-            state[dim] = currentRanks[dim];
-            dim--;
+        for (var si = 0; si < stack.length; si++) {
+            allBlocks.push(stack[si]);
         }
-        if (dim < 0) break;
     }
 
-    var _goalKey = new Array(n).fill(50).join(",");
-    console.debug("[DP] goal score:", dp.get(_goalKey));
+    // ブロックを p/w 比の降順でソート (整数比較)
+    allBlocks.sort(function (a, b) {
+        var lhs = a.p * b.w;
+        var rhs = b.p * a.w;
+        if (lhs > rhs) return -1;
+        if (lhs < rhs) return 1;
+        return 0;
+    });
 
-    return { dp: dp, dpPre: dpPre };
-}
-
-/* ------------------------------------------------------------------ */
-/*  経路復元                                                           */
-/* ------------------------------------------------------------------ */
-
-function _solver_reconstructPath(dp, dpPre, numCostumes) {
-    var goalKey = new Array(numCostumes).fill(50).join(",");
-    if (!dp.has(goalKey)) return null;
-
-    var path = [];
-    var key = goalKey;
-    while (key !== undefined) {
-        path.push(key.split(",").map(Number));
-        key = dpPre.get(key);
+    // スケジュールに従って経路とスコアを構築
+    var state = currentRanks.slice();
+    var path = [state.slice()];
+    var totalScore = 0;
+    var currentBonus = 0;
+    for (var i = 0; i < n; i++) {
+        currentBonus += cumPerCostume[i][state[i]];
     }
-    path.reverse();
-    return path;
+
+    for (var bi = 0; bi < allBlocks.length; bi++) {
+        var jobs = allBlocks[bi].jobs;
+        for (var ji = 0; ji < jobs.length; ji++) {
+            var job = jobs[ji];
+            var exp = _solver_BOND_EXP_PER_LEVEL[job.r - 1];
+            var delta = cumPerCostume[job.ci][job.r + 1] - cumPerCostume[job.ci][job.r];
+            totalScore += exp * currentBonus;
+            state[job.ci] = job.r + 1;
+            currentBonus += delta;
+            path.push(state.slice());
+        }
+    }
+
+    console.debug("[Sidney] goal score:", totalScore);
+    return { path: path, totalScore: totalScore };
 }
 
 /* ------------------------------------------------------------------ */
@@ -366,135 +331,11 @@ function _solver_spinnerComponent() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  ビームサーチソルバー                                                  */
-/* ------------------------------------------------------------------ */
-
-/**
- * ビームサーチ（経験値効率ソート）。
- *
- * 各深さ（レベルアップ回数）ごとにビーム幅の上位状態を保持し、
- * 全て展開して次の深さの候補を生成する。
- * ソートキーは score / totalExp（経験値効率）。
- *
- * 厳密解は保証しないが、衣装数が多い場合でも実用的な解を返す。
- */
-function _solver_solveBeam(currentRanks, allBondBonuses) {
-    var n = currentRanks.length;
-    // 衣装数に応じてビーム幅を自動調整 (計算量 ∝ width * n^2 を一定に保つ)
-    var BEAM_WIDTH = Math.min(10000, Math.floor(160000 / (n * n)));
-    var cumPerCostume = allBondBonuses.map(function (bb) {
-        return _solver_cumulativeBonus(bb);
-    });
-
-    var totalSteps = 0;
-    for (var i = 0; i < n; i++) totalSteps += 50 - currentRanks[i];
-
-    var initialKey = currentRanks.join(",");
-
-    var bestScore = new Map();
-    bestScore.set(initialKey, 0);
-    var dp = new Map();
-    dp.set(initialKey, 0);
-    var dpPre = new Map();
-
-    // currentBeam: [{ score, totalExp, state, key }]
-    var currentBeam = [{ score: 0, totalExp: 0, state: currentRanks.slice(), key: initialKey }];
-
-    for (var depth = 0; depth < totalSteps; depth++) {
-        // 候補を生成: nextKey -> { score, totalExp, state, prevKey }
-        var candidates = new Map();
-
-        for (var bi = 0; bi < currentBeam.length; bi++) {
-            var item = currentBeam[bi];
-            var score = item.score;
-            var totalExp = item.totalExp;
-            var state = item.state;
-            var key = item.key;
-
-            if (score < bestScore.get(key)) continue;
-
-            var bonus = _solver_getBonus(state, cumPerCostume);
-
-            for (var ci = 0; ci < n; ci++) {
-                if (state[ci] >= 50) continue;
-
-                var exp = _solver_BOND_EXP_PER_LEVEL[state[ci] - 1];
-                var newScore = score + exp * bonus;
-                var newTotalExp = totalExp + exp;
-
-                state[ci]++;
-                var newKey = state.join(",");
-                state[ci]--;
-
-                var existing = candidates.get(newKey);
-                if (!existing || newScore > existing.score) {
-                    candidates.set(newKey, {
-                        score: newScore,
-                        totalExp: newTotalExp,
-                        prevKey: key,
-                    });
-                }
-            }
-        }
-
-        // efficiency (score / totalExp) 降順でソートし上位 BEAM_WIDTH 個を保持
-        var arr = [];
-        candidates.forEach(function (val, nk) {
-            arr.push({ key: nk, score: val.score, totalExp: val.totalExp, prevKey: val.prevKey });
-        });
-        arr.sort(function (a, b) {
-            return (b.score / b.totalExp) - (a.score / a.totalExp);
-        });
-        if (arr.length > BEAM_WIDTH) arr.length = BEAM_WIDTH;
-
-        currentBeam = [];
-        for (var ai = 0; ai < arr.length; ai++) {
-            var e = arr[ai];
-            var oldBest = bestScore.get(e.key);
-            if (oldBest === undefined || e.score > oldBest) {
-                bestScore.set(e.key, e.score);
-                dp.set(e.key, e.score);
-                dpPre.set(e.key, e.prevKey);
-            }
-            currentBeam.push({
-                score: e.score,
-                totalExp: e.totalExp,
-                state: e.key.split(",").map(Number),
-                key: e.key,
-            });
-        }
-    }
-
-    var _goalKey = new Array(n).fill(50).join(",");
-    console.debug("[BeamSearch] goal score:", dp.get(_goalKey));
-
-    return { dp: dp, dpPre: dpPre };
-}
-
-/* ------------------------------------------------------------------ */
-/*  ソルバ��レジストリ                                                    */
-/* ------------------------------------------------------------------ */
-
-var _solver_registry = {
-    dp: _solver_solve,
-    chokudai: _solver_solveBeam,
-};
-
-function _solver_dispatch(solverType, currentRanks, allBondBonuses) {
-    var solver = _solver_registry[solverType];
-    if (!solver) {
-        throw new Error("未知のソルバー: " + solverType);
-    }
-    return solver(currentRanks, allBondBonuses);
-}
-
-/* ------------------------------------------------------------------ */
 /*  メイン計算ロジック                                                   */
 /* ------------------------------------------------------------------ */
 
 function _solver_calcChartSync(
-    rankValues, rankIds, bondValues, bondIds, costumeValues, costumeIds,
-    solverType
+    rankValues, rankIds, bondValues, bondIds, costumeValues, costumeIds
 ) {
     // --- データ組み立て ---
     var idxOrder = costumeIds.map(function (id) {
@@ -524,14 +365,11 @@ function _solver_calcChartSync(
         return bondMap[idx];
     });
 
-    // --- ソルバー実行 ---
-    var result = _solver_dispatch(solverType || "dp", currentRanks, allBondBonuses);
-    var dp = result.dp;
-    var dpPre = result.dpPre;
+    // --- Sidney 分解ソルバー実行 ---
+    var result = _solver_solveSidney(currentRanks, allBondBonuses);
+    var path = result.path;
 
-    // --- 経路復元 ---
-    var path = _solver_reconstructPath(dp, dpPre, idxOrder.length);
-    if (!path) {
+    if (!path || path.length === 0) {
         return _solver_h("P", {
             children: "\u7d4c\u8def\u304c\u898b\u3064\u304b\u308a\u307e\u305b\u3093\u3067\u3057\u305f\u3002",
             style: { color: "red" },
@@ -771,8 +609,7 @@ window.dash_clientside.solver = {
         bondValues,
         bondIds,
         costumeValues,
-        costumeIds,
-        solverType
+        costumeIds
     ) {
         if (!n_clicks) return [
             window.dash_clientside.no_update,
@@ -786,14 +623,13 @@ window.dash_clientside.solver = {
             bondIds: bondIds,
             costumeValues: costumeValues,
             costumeIds: costumeIds,
-            solverType: solverType,
         };
 
         return [_solver_spinnerComponent(), inputs];
     },
 
     /**
-     * ステップ2: DP 実行 + 結果表示
+     * ステップ2: Sidney 分解実行 + 結果表示
      */
     calc_chart: function (solverInputs) {
         if (!solverInputs) return window.dash_clientside.no_update;
@@ -807,8 +643,7 @@ window.dash_clientside.solver = {
                         solverInputs.bondValues,
                         solverInputs.bondIds,
                         solverInputs.costumeValues,
-                        solverInputs.costumeIds,
-                        solverInputs.solverType
+                        solverInputs.costumeIds
                     )
                 );
             }, 50);

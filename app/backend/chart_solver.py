@@ -1,6 +1,6 @@
 """チャート計算ロジック。"""
 
-import numpy as np
+import functools
 
 from app.backend.bond_exp import BOND_EXP_PER_LEVEL
 from app.backend.student import BOND_RANGES
@@ -24,25 +24,12 @@ def _cumulative_bonus(bond_bonuses: list[int]) -> list[int]:
     return cum
 
 
-def _build_bonus_table(all_bond_bonuses: list[list[int]]) -> np.ndarray:
-    """全衣装・全状態でのボーナス合計テーブルを構築する。
+def _build_bonus_table(all_bond_bonuses: list[list[int]]):
+    """全衣装・全状態でのボーナス合計テーブルを構築する (テスト用)。"""
+    import numpy as np
 
-    Parameters
-    ----------
-    all_bond_bonuses : list[list[int]]
-        各衣装の bond_bonuses (長さ 7)
-
-    Returns
-    -------
-    np.ndarray
-        shape = (51,) * num_costumes, dtype=int64
-        各要素は全衣装の累積ボーナス合計
-    """
     num_costumes = len(all_bond_bonuses)
-    # 各衣装の累積ボーナス (shape: (num_costumes, 51))
     cum_per_costume = [_cumulative_bonus(bb) for bb in all_bond_bonuses]
-
-    # 各衣装の累積ボーナスを適切な軸に展開して合算
     total = np.zeros((51,) * num_costumes, dtype=np.int64)
     for i, cum in enumerate(cum_per_costume):
         shape = [1] * num_costumes
@@ -52,77 +39,23 @@ def _build_bonus_table(all_bond_bonuses: list[list[int]]) -> np.ndarray:
 
 
 def solve_dp(current_ranks: list[int], all_bond_bonuses: list[list[int]]):
-    """動的計画法でチャートを計算する。
+    """動的計画法でチャートを計算する (テスト用)。"""
+    import itertools
+    import numpy as np
 
-    Parameters
-    ----------
-    current_ranks : list[int]
-        各衣装の現在の絆ランク (1~50)
-    all_bond_bonuses : list[list[int]]
-        各衣装の bond_bonuses (長さ 7)
-
-    Returns
-    -------
-    dp : np.ndarray
-        shape = (51,) * num_costumes, dtype=int64
-    dp_pre : np.ndarray
-        shape = (51,) * num_costumes, dtype=object
-        各要素は遷移元のインデックスタプル（または None）
-    """
     num_costumes = len(current_ranks)
     shape = (51,) * num_costumes
     dp = np.full(shape, np.iinfo(np.int64).min, dtype=np.int64)
-    dp_pre = np.empty(shape, dtype=object)
-    # 同点時タイブレーク用: どの衣装を上げてこの状態に来たか
-    dp_moved = np.full(shape, -1, dtype=np.int8)
+    dp[tuple(current_ranks)] = 0
 
-    # 初期状態
-    initial = tuple(current_ranks)
-    dp[initial] = 0
-
-    # ボーナス合計テーブル
     bonus_table = _build_bonus_table(all_bond_bonuses)
 
-    def _is_better_tie(state, next_state, moved_costume, new_val):
-        """同点時に遷移を更新すべきか判定する。
-
-        優先度:
-        1. 同じ衣装を続ける（連続優先）
-        2. 現在ランクが低い衣装を優先（バランス優先）
-        3. 衣装番号が若い順（固定順序）
-        """
-        old_moved = dp_moved[next_state]
-        if old_moved < 0:
-            return True
-
-        # 遷移元でどの衣装を上げたか
-        prev_moved = dp_moved[state]
-
-        # 1. 連続優先: 遷移元と同じ衣装を上げるほうを優先
-        new_continues = (moved_costume == prev_moved)
-        old_continues = (old_moved == prev_moved)
-        if new_continues != old_continues:
-            return new_continues
-
-        # 2. バランス優先: ランクが低い衣装を優先
-        new_rank = state[moved_costume]  # 上げる前のランク
-        old_src = dp_pre[next_state]
-        old_rank = old_src[old_moved] if old_src is not None else 50
-        if new_rank != old_rank:
-            return new_rank < old_rank
-
-        # 3. 固定順序: 衣装番号が若い方を優先
-        return moved_costume < old_moved
-
-    # 全状態を列挙して遷移
-    import itertools
     ranges = [range(r, 51) for r in current_ranks]
     for state in itertools.product(*ranges):
         val = dp[state]
         if val == np.iinfo(np.int64).min:
             continue
         bonus = bonus_table[state]
-        # 各衣装のランクを1つ上げる遷移
         for i in range(num_costumes):
             if state[i] >= 50:
                 continue
@@ -131,100 +64,86 @@ def solve_dp(current_ranks: list[int], all_bond_bonuses: list[list[int]]):
             next_state = list(state)
             next_state[i] += 1
             next_state = tuple(next_state)
-            if new_val > dp[next_state] or (
-                new_val == dp[next_state] and _is_better_tie(state, next_state, i, new_val)
-            ):
+            if new_val > dp[next_state]:
                 dp[next_state] = new_val
-                dp_pre[next_state] = state
-                dp_moved[next_state] = i
 
-    return dp, dp_pre
+    return dp
 
 
-def solve_beam(current_ranks: list[int], all_bond_bonuses: list[list[int]]):
-    """ビームサーチ（経験値効率ソート）でチャートを計算する。
+def solve(current_ranks: list[int], all_bond_bonuses: list[list[int]]):
+    """Sidney 分解でチャートを計算する。
 
-    各深さごとにビーム幅の上位状態を全展開し、
-    score / total_exp（経験値効率）でソートして次の深さに進む。
-    厳密解は保証しないが、衣装数が多い場合でも実用的な解を返す。
+    問題を 1|chains|max Σw_jC_j に帰着し、Sidney 分解により
+    O(T log T) で厳密な最適解を求める（T = 総ステップ数）。
 
     Returns
     -------
-    best_score : dict[tuple, int]
-        各状態の最高スコア
-    pre : dict[tuple, tuple]
-        各状態の遷移元
+    path : list[tuple[int, ...]]
+        初期状態から最終状態 (50, ..., 50) までの経路
+    total_score : int
+        最適スコア
     """
     num_costumes = len(current_ranks)
-    # 衣装数に応じてビーム幅を自動調整 (計算量 ∝ width * n^2 を一定に保つ)
-    beam_width = min(10000, 160000 // (num_costumes * num_costumes))
     cum_per_costume = [_cumulative_bonus(bb) for bb in all_bond_bonuses]
 
-    total_steps = sum(50 - r for r in current_ranks)
+    # 各衣装のジョブチェーンを構築
+    # ジョブ: (w=exp, p=δ, costume_idx, rank)
+    chains: list[list[tuple[int, int, int, int]]] = []
+    for i in range(num_costumes):
+        chain = []
+        for r in range(current_ranks[i], 50):
+            w = BOND_EXP_PER_LEVEL[r - 1]
+            p = cum_per_costume[i][r + 1] - cum_per_costume[i][r]
+            chain.append((w, p, i, r))
+        chains.append(chain)
 
-    initial = tuple(current_ranks)
-    best_score: dict[tuple, int] = {initial: 0}
-    pre: dict[tuple, tuple] = {}
+    # Sidney 分解: 各チェーン内で p/w 比が非増加になるようブロックをマージ
+    # max Σw_jC_j では高 p/w ブロックを先にスケジュールする
+    all_blocks: list[tuple[int, int, list[tuple[int, int, int, int]]]] = []
 
-    # current_beam: list of (score, total_exp, state)
-    current_beam = [(0, 0, initial)]
+    for chain in chains:
+        stack: list[tuple[int, int, list]] = []  # (total_p, total_w, jobs)
+        for job in chain:
+            w, p, ci, r = job
+            new_block: tuple[int, int, list] = (p, w, [job])
+            while stack:
+                top_p, top_w, top_jobs = stack[-1]
+                new_p, new_w = new_block[0], new_block[1]
+                # top の p/w < new の p/w ならマージ (整数比較で除算回避)
+                if top_p * new_w < new_p * top_w:
+                    stack.pop()
+                    new_block = (top_p + new_p, top_w + new_w, top_jobs + new_block[2])
+                else:
+                    break
+            stack.append(new_block)
+        all_blocks.extend(stack)
 
-    for _depth in range(total_steps):
-        # 候補生成: next_state -> (score, total_exp, prev_state)
-        candidates: dict[tuple, tuple[int, int, tuple]] = {}
+    # ブロックを p/w 比の降順でソート (整数比較)
+    def cmp_blocks(a, b):
+        lhs = a[0] * b[1]  # a.p * b.w
+        rhs = b[0] * a[1]  # b.p * a.w
+        if lhs > rhs:
+            return -1
+        if lhs < rhs:
+            return 1
+        return 0
 
-        for score, total_exp, state in current_beam:
-            if score < best_score.get(state, 0):
-                continue
+    all_blocks.sort(key=functools.cmp_to_key(cmp_blocks))
 
-            bonus = sum(cum_per_costume[i][state[i]] for i in range(num_costumes))
+    # スケジュールに従って経路とスコアを構築
+    state = list(current_ranks)
+    path: list[tuple[int, ...]] = [tuple(state)]
+    total_score = 0
+    current_bonus = sum(cum_per_costume[i][state[i]] for i in range(num_costumes))
 
-            for i in range(num_costumes):
-                if state[i] >= 50:
-                    continue
+    for _block_p, _block_w, jobs in all_blocks:
+        for w, p, ci, r in jobs:
+            total_score += w * current_bonus
+            state[ci] = r + 1
+            current_bonus += p
+            path.append(tuple(state))
 
-                exp = BOND_EXP_PER_LEVEL[state[i] - 1]
-                new_score = score + exp * bonus
-                new_total_exp = total_exp + exp
-
-                next_state = list(state)
-                next_state[i] += 1
-                next_state = tuple(next_state)
-
-                existing = candidates.get(next_state)
-                if existing is None or new_score > existing[0]:
-                    candidates[next_state] = (new_score, new_total_exp, state)
-
-        # efficiency 降順でソートし上位 beam_width 個を保持
-        sorted_cands = sorted(
-            candidates.items(),
-            key=lambda x: x[1][0] / x[1][1] if x[1][1] > 0 else 0,
-            reverse=True,
-        )[:beam_width]
-
-        current_beam = []
-        for ns, (sc, te, prev) in sorted_cands:
-            old = best_score.get(ns)
-            if old is None or sc > old:
-                best_score[ns] = sc
-                pre[ns] = prev
-            current_beam.append((sc, te, ns))
-
-    return best_score, pre
-
-
-_SOLVERS = {
-    "dp": solve_dp,
-    "chokudai": solve_beam,
-}
-
-
-def solve(current_ranks: list[int], all_bond_bonuses: list[list[int]], *, solver_type: str = "dp"):
-    """ソルバーを選択してチャートを計算する。"""
-    solver = _SOLVERS.get(solver_type)
-    if solver is None:
-        raise ValueError(f"未知のソルバー: {solver_type}")
-    return solver(current_ranks, all_bond_bonuses)
+    return path, total_score
 
 
 def summarize_path(path: list[tuple[int, ...]], costume_names: list[str]) -> list[dict]:

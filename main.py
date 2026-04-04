@@ -24,7 +24,6 @@ application.clientside_callback(
     State({"type": "bond", "range_idx": ALL, "index": ALL}, "id"),
     State({"type": "costume", "index": ALL}, "value"),
     State({"type": "costume", "index": ALL}, "id"),
-    State("solver-type", "value"),
     prevent_initial_call=True,
 )
 
