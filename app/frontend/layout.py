@@ -66,6 +66,7 @@ def make_student_card(
                         "✕",
                         id={"type": "remove-student", "index": index},
                         n_clicks=0,
+                        className="remove-student-btn",
                         style={
                             "marginLeft": "auto",
                             "background": "none",
@@ -75,6 +76,7 @@ def make_student_card(
                         },
                     ),
                 ],
+                className="student-card-header",
                 style={
                     "display": "flex",
                     "alignItems": "center",
@@ -89,6 +91,7 @@ def make_student_card(
             ),
         ],
         id={"type": "student-card", "index": index},
+        className="student-card",
         style={
             "border": "1px solid #ccc",
             "borderRadius": "8px",
@@ -184,6 +187,7 @@ def create_layout() -> html.Div:
                                 },
                             ),
                         ],
+                        className="page-header-right",
                         style={
                             "marginLeft": "auto",
                             "display": "flex",
@@ -271,6 +275,7 @@ def create_layout() -> html.Div:
                                         },
                                     ),
                                 ],
+                                className="preset-section",
                                 style={
                                     "padding": "10px",
                                     "border": "1px solid #ddd",
@@ -299,7 +304,18 @@ def create_layout() -> html.Div:
                             html.Div(
                                 [
                                     html.Button(
-                                        "+ 衣装追加", id="add-student-btn", n_clicks=0
+                                        "+ 衣装追加",
+                                        id="add-student-btn",
+                                        className="add-student-btn",
+                                        n_clicks=0,
+                                        style={
+                                            "padding": "8px 16px",
+                                            "cursor": "pointer",
+                                            "borderRadius": "6px",
+                                            "border": "1px solid #ccc",
+                                            "background": "#fff",
+                                            "fontSize": "0.95rem",
+                                        },
                                     ),
                                 ],
                                 style={"marginBottom": "16px"},
@@ -325,6 +341,7 @@ def create_layout() -> html.Div:
                                         },
                                     ),
                                 ],
+                                className="bond-rank-section",
                                 style={
                                     "padding": "12px",
                                     "border": "1px solid #ccc",
@@ -334,21 +351,24 @@ def create_layout() -> html.Div:
                                 },
                             ),
                             # チャート計算ボタン
-                            html.Button(
-                                "チャート計算",
-                                id="calc-chart-btn",
-                                n_clicks=0,
-                                style={
-                                    "width": "100%",
-                                    "padding": "12px 24px",
-                                    "fontSize": "1.1rem",
-                                    "fontWeight": "bold",
-                                    "background": "#4a90d9",
-                                    "color": "white",
-                                    "border": "none",
-                                    "borderRadius": "6px",
-                                    "cursor": "pointer",
-                                },
+                            html.Div(
+                                html.Button(
+                                    "チャート計算",
+                                    id="calc-chart-btn",
+                                    n_clicks=0,
+                                    style={
+                                        "width": "100%",
+                                        "padding": "12px 24px",
+                                        "fontSize": "1.1rem",
+                                        "fontWeight": "bold",
+                                        "background": "#4a90d9",
+                                        "color": "white",
+                                        "border": "none",
+                                        "borderRadius": "6px",
+                                        "cursor": "pointer",
+                                    },
+                                ),
+                                className="calc-btn-wrapper",
                             ),
                             # 計算結果表示エリア
                             html.Div(

@@ -520,6 +520,18 @@ function _solver_calcChartSync(
         rows: csvRows,
     });
 
+    // --- 詳細チャート CSV 用データ ---
+    var detailCsvHeader = costumeNames.slice();
+    var detailCsvRows = path.map(function (step) {
+        return costumeNames.map(function (_, ci) {
+            return String(step[ci]);
+        });
+    });
+    window._bondDetailCsvData = JSON.stringify({
+        header: detailCsvHeader,
+        rows: detailCsvRows,
+    });
+
     // --- 結果コンポーネント ---
     var btnStyle = {
         padding: "6px 16px",
@@ -586,7 +598,36 @@ function _solver_calcChartSync(
                             fontWeight: "bold",
                         },
                     }),
-                    detailTable,
+                    _solver_h("Div", {
+                        children: [
+                            _solver_h("Button", {
+                                children: "\u753b\u50cf\u4fdd\u5b58",
+                                id: "save-detail-image-btn",
+                                n_clicks: 0,
+                                style: Object.assign({}, btnStyle, {
+                                    background: "#e67e22",
+                                }),
+                            }),
+                            _solver_h("Button", {
+                                children: "CSV\u4fdd\u5b58",
+                                id: "save-detail-csv-btn",
+                                n_clicks: 0,
+                                style: Object.assign({}, btnStyle, {
+                                    background: "#8e44ad",
+                                }),
+                            }),
+                        ],
+                        style: {
+                            display: "flex",
+                            gap: "8px",
+                            justifyContent: "flex-end",
+                            marginBottom: "8px",
+                        },
+                    }),
+                    _solver_h("Div", {
+                        children: detailTable,
+                        id: "detail-table-container",
+                    }),
                 ],
             }),
         ],

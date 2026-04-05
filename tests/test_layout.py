@@ -1,0 +1,285 @@
+"""レイアウト / UIコンポーネントのテスト。
+
+ブラウザ不要でDashコンポーネントの構造・属性を検証する。
+"""
+
+import pytest
+
+from app.backend.presets import PRESETS
+from app.backend.student import BOND_RANGES
+from app.frontend.layout import (
+    create_layout,
+    make_student_card,
+    _make_bond_rank_input,
+    _default_costume_name,
+)
+
+
+# ---------------------------------------------------------------------------
+# ヘルパー
+# ---------------------------------------------------------------------------
+
+
+def _find_by_id(component, target_id, *, results=None):
+    """コンポーネントツリーからIDが一致する要素を再帰的に探す。"""
+    if results is None:
+        results = []
+    props = getattr(component, "__dict__", {}) or {}
+    if not props:
+        return results
+    cid = props.get("id")
+    matched = False
+    if cid == target_id:
+        matched = True
+    elif isinstance(cid, dict) and isinstance(target_id, dict):
+        if all(cid.get(k) == v for k, v in target_id.items()):
+            matched = True
+    if matched:
+        results.append(component)
+        return results  # ID一致したらその下は探索しない（重複防止）
+    for child in _iter_children(component):
+        _find_by_id(child, target_id, results=results)
+    return results
+
+
+def _find_by_class(component, class_name, *, results=None):
+    """コンポーネントツリーからclassNameが一致する要素を再帰的に探す。"""
+    if results is None:
+        results = []
+    props = getattr(component, "__dict__", {}) or {}
+    if class_name in (props.get("className") or "").split():
+        results.append(component)
+    for child in _iter_children(component):
+        _find_by_class(child, class_name, results=results)
+    return results
+
+
+def _iter_children(component):
+    """コンポーネントの子要素をイテレートする。"""
+    props = getattr(component, "__dict__", {}) or {}
+    children = props.get("children")
+    if children is None:
+        return
+    if isinstance(children, (list, tuple)):
+        for c in children:
+            if hasattr(c, "__dict__"):
+                yield c
+    elif hasattr(children, "__dict__"):
+        yield children
+
+
+# ---------------------------------------------------------------------------
+# create_layout
+# ---------------------------------------------------------------------------
+
+
+class TestCreateLayout:
+    """create_layout() が必要な要素を含むことを検証する。"""
+
+    @pytest.fixture()
+    def layout(self):
+        return create_layout()
+
+    def test_page_container_class(self, layout):
+        assert layout.className == "page-container"
+
+    def test_has_header(self, layout):
+        found = _find_by_class(layout, "page-header")
+        assert len(found) == 1
+
+    def test_has_header_right(self, layout):
+        found = _find_by_class(layout, "page-header-right")
+        assert len(found) == 1
+
+    def test_has_sidebar(self, layout):
+        found = _find_by_class(layout, "sidebar")
+        assert len(found) == 1
+
+    def test_has_main_columns(self, layout):
+        found = _find_by_class(layout, "main-columns")
+        assert len(found) == 1
+
+    def test_has_preset_dropdown(self, layout):
+        found = _find_by_id(layout, "preset-dropdown")
+        assert len(found) == 1
+
+    def test_has_calc_button(self, layout):
+        found = _find_by_id(layout, "calc-chart-btn")
+        assert len(found) == 1
+
+    def test_calc_button_wrapper_class(self, layout):
+        found = _find_by_class(layout, "calc-btn-wrapper")
+        assert len(found) == 1
+
+    def test_has_manual_modal(self, layout):
+        found = _find_by_id(layout, "manual-modal")
+        assert len(found) == 1
+        modal = found[0]
+        assert modal.style.get("display") == "none"
+
+    def test_has_add_student_btn(self, layout):
+        found = _find_by_id(layout, "add-student-btn")
+        assert len(found) == 1
+        assert "add-student-btn" in found[0].className
+
+    def test_has_bond_rank_section(self, layout):
+        found = _find_by_class(layout, "bond-rank-section")
+        assert len(found) == 1
+
+    def test_has_chart_result_area(self, layout):
+        found = _find_by_class(layout, "chart-result-area")
+        assert len(found) == 1
+
+    def test_has_stores(self, layout):
+        for store_id in ("student-indices", "next-student-index", "solver-inputs"):
+            found = _find_by_id(layout, store_id)
+            assert len(found) == 1, f"Store '{store_id}' が見つからない"
+
+    def test_default_student_card_count(self, layout):
+        found = _find_by_id(layout, "students-container")
+        assert len(found) == 1
+        container = found[0]
+        assert len(container.children) == 1
+
+
+# ---------------------------------------------------------------------------
+# make_student_card
+# ---------------------------------------------------------------------------
+
+
+class TestMakeStudentCard:
+    """make_student_card() の出力を検証する。"""
+
+    def test_default_values(self):
+        card = make_student_card(0)
+        assert card.id == {"type": "student-card", "index": 0}
+        assert card.className == "student-card"
+
+    def test_custom_costume_name(self):
+        card = make_student_card(2, costume_name="水着")
+        inputs = _find_by_id(card, {"type": "costume", "index": 2})
+        assert len(inputs) == 1
+        assert inputs[0].value == "水着"
+
+    def test_default_costume_name(self):
+        card = make_student_card(3)
+        inputs = _find_by_id(card, {"type": "costume", "index": 3})
+        assert inputs[0].value == "衣装4"
+
+    def test_bond_fields_count(self):
+        card = make_student_card(0)
+        bond_fields = _find_by_class(card, "bond-fields")
+        assert len(bond_fields) == 1
+        assert len(bond_fields[0].children) == len(BOND_RANGES)
+
+    def test_bond_default_zero(self):
+        card = make_student_card(0)
+        for i in range(len(BOND_RANGES)):
+            inputs = _find_by_id(
+                card, {"type": "bond", "range_idx": i, "index": 0}
+            )
+            assert len(inputs) == 1
+            assert inputs[0].value == 0
+
+    def test_bond_custom_values(self):
+        bonuses = [1, 2, 3, 4, 5, 6, 7]
+        card = make_student_card(1, bond_bonuses=bonuses)
+        for i, expected in enumerate(bonuses):
+            inputs = _find_by_id(
+                card, {"type": "bond", "range_idx": i, "index": 1}
+            )
+            assert inputs[0].value == expected
+
+    def test_has_remove_button(self):
+        card = make_student_card(0)
+        btns = _find_by_class(card, "remove-student-btn")
+        assert len(btns) == 1
+
+    def test_has_student_card_header(self):
+        card = make_student_card(0)
+        headers = _find_by_class(card, "student-card-header")
+        assert len(headers) == 1
+
+
+# ---------------------------------------------------------------------------
+# _make_bond_rank_input
+# ---------------------------------------------------------------------------
+
+
+class TestMakeBondRankInput:
+    """_make_bond_rank_input() の出力を検証する。"""
+
+    def test_default_value(self):
+        inp = _make_bond_rank_input(0)
+        rank_inputs = _find_by_id(inp, {"type": "bond-rank", "index": 0})
+        assert len(rank_inputs) == 1
+        assert rank_inputs[0].value == 20
+
+    def test_custom_value(self):
+        inp = _make_bond_rank_input(1, value=35)
+        rank_inputs = _find_by_id(inp, {"type": "bond-rank", "index": 1})
+        assert rank_inputs[0].value == 35
+
+    def test_min_max(self):
+        inp = _make_bond_rank_input(0)
+        rank_inputs = _find_by_id(inp, {"type": "bond-rank", "index": 0})
+        assert rank_inputs[0].min == 1
+        assert rank_inputs[0].max == 50
+
+    def test_label_default(self):
+        inp = _make_bond_rank_input(2)
+        labels = _find_by_id(inp, {"type": "bond-rank-label", "index": 2})
+        assert len(labels) == 1
+        assert labels[0].children == "衣装3"
+
+    def test_label_custom(self):
+        inp = _make_bond_rank_input(0, costume_name="通常")
+        labels = _find_by_id(inp, {"type": "bond-rank-label", "index": 0})
+        assert labels[0].children == "通常"
+
+
+# ---------------------------------------------------------------------------
+# _default_costume_name
+# ---------------------------------------------------------------------------
+
+
+class TestDefaultCostumeName:
+    @pytest.mark.parametrize("index, expected", [(0, "衣装1"), (1, "衣装2"), (9, "衣装10")])
+    def test_names(self, index, expected):
+        assert _default_costume_name(index) == expected
+
+
+# ---------------------------------------------------------------------------
+# プリセット連携
+# ---------------------------------------------------------------------------
+
+
+class TestPresetsIntegration:
+    """全プリセットで make_student_card が正しく生成されることを検証する。"""
+
+    @pytest.mark.parametrize("name", list(PRESETS.keys()))
+    def test_preset_cards(self, name):
+        students = PRESETS[name]
+        for i, s in enumerate(students):
+            card = make_student_card(
+                i,
+                costume_name=s["costume_name"],
+                bond_bonuses=s["bond_bonuses"],
+            )
+            # 衣装名が正しい
+            inputs = _find_by_id(card, {"type": "costume", "index": i})
+            assert inputs[0].value == s["costume_name"]
+            # 絆ボーナスが正しい
+            for ri, val in enumerate(s["bond_bonuses"]):
+                bond = _find_by_id(
+                    card, {"type": "bond", "range_idx": ri, "index": i}
+                )
+                assert bond[0].value == val
+
+    @pytest.mark.parametrize("name", list(PRESETS.keys()))
+    def test_preset_bond_rank_inputs(self, name):
+        students = PRESETS[name]
+        for i, s in enumerate(students):
+            inp = _make_bond_rank_input(i, costume_name=s["costume_name"])
+            labels = _find_by_id(inp, {"type": "bond-rank-label", "index": i})
+            assert labels[0].children == s["costume_name"]

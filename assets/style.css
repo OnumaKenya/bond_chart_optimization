@@ -77,34 +77,148 @@ input[type="number"] {
 
     /* ページ全体のパディングを縮小 */
     .page-container {
-        padding: 12px !important;
+        padding: 10px !important;
     }
 
-    /* ヘッダー行 */
+    /* ヘッダー行: 縦積み中央揃え */
     .page-header {
-        flex-wrap: wrap !important;
-        gap: 8px !important;
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 6px !important;
     }
     .page-header h1 {
-        font-size: 1.3rem !important;
+        font-size: 1.25rem !important;
+    }
+    .page-header-right {
+        width: 100% !important;
+        justify-content: space-between !important;
+        margin-left: 0 !important;
     }
 
-    /* 衣装カード内の絆入力を2列に */
+    /* 衣装カード */
+    .student-card {
+        padding: 10px !important;
+    }
+    .student-card-header input[type="text"] {
+        font-size: 0.9rem !important;
+    }
+
+    /* 衣装カード内の絆入力をグリッド化 */
     .bond-fields {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)) !important;
         gap: 6px !important;
     }
     .bond-fields > div {
-        min-width: 60px !important;
+        min-width: 0 !important;
+    }
+    .bond-fields input {
+        font-size: 0.95rem !important;
+        padding: 6px 4px !important;
     }
 
     /* 絆ランク入力行 */
     .bond-rank-row {
-        gap: 6px !important;
+        display: grid !important;
+        grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)) !important;
+        gap: 8px !important;
+    }
+    .bond-rank-section {
+        padding: 10px !important;
     }
 
-    /* 結果テーブルの横スクロール */
+    /* 全ボタン: タッチしやすい最小高さ */
+    button,
+    .dash-dropdown .Select-control {
+        min-height: 44px !important;
+    }
+
+    /* 衣装追加ボタン */
+    .add-student-btn {
+        width: 100% !important;
+        padding: 10px 16px !important;
+        font-size: 1rem !important;
+    }
+
+    /* 計算ボタン: 画面下部に固定 */
+    .calc-btn-wrapper {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        padding: 10px !important;
+        background: rgba(255, 255, 255, 0.95) !important;
+        backdrop-filter: blur(8px) !important;
+        -webkit-backdrop-filter: blur(8px) !important;
+        box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1) !important;
+        z-index: 100 !important;
+    }
+    .calc-btn-wrapper button {
+        border-radius: 8px !important;
+    }
+
+    /* 結果エリア: 固定ボタン分の余白 */
     .chart-result-area {
         overflow-x: auto !important;
         -webkit-overflow-scrolling: touch;
+        padding-bottom: 72px !important;
+    }
+
+    /* 結果テーブルの可読性向上 */
+    .chart-result-area table {
+        font-size: 0.85rem !important;
+    }
+    .chart-result-area th,
+    .chart-result-area td {
+        padding: 6px 8px !important;
+        white-space: nowrap;
+    }
+
+    /* プリセットセクション */
+    .preset-section {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        align-items: flex-end !important;
+        gap: 8px !important;
+    }
+    .preset-section > strong {
+        width: 100% !important;
+    }
+    .preset-section .dash-dropdown {
+        flex: 1 !important;
+        min-width: 0 !important;
+    }
+    .preset-section button {
+        flex-shrink: 0 !important;
+        width: auto !important;
+        margin-top: 0 !important;
+        padding: 8px 20px !important;
+    }
+
+    /* モーダル */
+    .manual-modal-content {
+        width: 95vw !important;
+        max-height: 90vh !important;
+        padding: 16px !important;
+        border-radius: 8px !important;
+    }
+
+    /* 削除ボタン: タップしやすく */
+    .remove-student-btn {
+        width: 32px !important;
+        height: 32px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+}
+
+/* ── 小さいスマホ対応 (360px以下) ── */
+@media (max-width: 360px) {
+    .page-header h1 {
+        font-size: 1.1rem !important;
+    }
+    .bond-fields {
+        grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)) !important;
     }
 }

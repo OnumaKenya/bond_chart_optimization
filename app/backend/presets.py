@@ -55,4 +55,27 @@ PRESETS: dict[str, list[dict]] = {
         {"costume_name": "通常", "bond_bonuses": [1, 2, 2, 3, 1, 1, 2]},
         {"costume_name": "パジャマ", "bond_bonuses": [1, 2, 3, 4, 1, 1, 2]},
     ],
+    "トキ": [
+        {"costume_name": "通常", "bond_bonuses": [2, 3, 5, 6, 1, 2, 4]},
+        {"costume_name": "バニー", "bond_bonuses": [3, 4, 5, 7, 2, 3, 4]},
+        {"costume_name": "臨戦", "bond_bonuses": [2, 3, 4, 5, 1, 2, 3]},
+    ],
+    "マキ": [
+        {"costume_name": "通常", "bond_bonuses": [2, 3, 5, 6, 1, 2, 4]},
+        {"costume_name": "キャンプ", "bond_bonuses": [3, 5, 6, 8, 2, 3, 5]},
+    ],
+    "サオリ": [
+        {"costume_name": "通常", "bond_bonuses": [2, 3, 4, 5, 1, 2, 3]},
+        {"costume_name": "ドレス", "bond_bonuses": [2, 4, 5, 7, 1, 2, 4]},
+        {"costume_name": "水着", "bond_bonuses": [2, 4, 5, 6, 1, 2, 4]},
+    ],
+    "カヨコ": [
+        {"costume_name": "通常", "bond_bonuses": [1, 2, 2, 3, 1, 1, 2]},
+        {"costume_name": "正月", "bond_bonuses": [1, 2, 3, 3, 1, 1, 2]},
+        {"costume_name": "ドレス", "bond_bonuses": [2, 3, 4, 5, 1, 2, 3]},
+    ],
+    "カズサ": [
+        {"costume_name": "通常", "bond_bonuses": [2, 4, 5, 6, 2, 2, 4]},
+        {"costume_name": "バンド", "bond_bonuses": [3, 4, 5, 7, 2, 2, 4]},
+    ],
 }
