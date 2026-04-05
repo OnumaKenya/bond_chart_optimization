@@ -141,7 +141,18 @@ def create_layout() -> html.Div:
                                 [
                                     "不具合・要望報告は",
                                     html.A(
-                                        "こちら",
+                                        "フォーム",
+                                        href="https://forms.gle/yxJYDAY55TPDkMr39",
+                                        target="_blank",
+                                        rel="noopener noreferrer",
+                                        style={
+                                            "color": "#4a90d9",
+                                            "textDecoration": "underline",
+                                        },
+                                    ),
+                                    "か",
+                                    html.A(
+                                        "Xアカウント",
                                         href="https://x.com/yankeiori",
                                         target="_blank",
                                         rel="noopener noreferrer",
