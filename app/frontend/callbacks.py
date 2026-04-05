@@ -4,7 +4,11 @@ from dash import callback, Input, Output, State, ALL, ctx
 from dash.exceptions import PreventUpdate
 
 from app.backend.presets import PRESETS
-from app.frontend.layout import make_student_card, _make_bond_rank_input, _default_costume_name
+from app.frontend.layout import (
+    make_student_card,
+    _make_bond_rank_input,
+    _default_costume_name,
+)
 
 
 @callback(
@@ -23,8 +27,14 @@ from app.frontend.layout import make_student_card, _make_bond_rank_input, _defau
     prevent_initial_call=True,
 )
 def update_students(
-    add_clicks, remove_clicks, load_preset_clicks,
-    indices, next_idx, children, preset_name, rank_children,
+    add_clicks,
+    remove_clicks,
+    load_preset_clicks,
+    indices,
+    next_idx,
+    children,
+    preset_name,
+    rank_children,
 ):
     trigger = ctx.triggered_id
 
@@ -40,14 +50,16 @@ def update_students(
         remove_idx = trigger["index"]
         indices = [i for i in indices if i != remove_idx]
         children = [
-            c for c in children
+            c
+            for c in children
             if not (
                 c["props"]["id"].get("type") == "student-card"
                 and c["props"]["id"].get("index") == remove_idx
             )
         ]
         rank_children = [
-            c for c in rank_children
+            c
+            for c in rank_children
             if not (
                 isinstance(c, dict)
                 and c["props"]["children"][1]["props"]["id"].get("index") == remove_idx
@@ -63,15 +75,20 @@ def update_students(
         new_indices = []
         new_rank_children = []
         for i, s in enumerate(students):
-            new_children.append(make_student_card(
-                i,
-                costume_name=s["costume_name"],
-                bond_bonuses=s["bond_bonuses"],
-            ))
+            new_children.append(
+                make_student_card(
+                    i,
+                    costume_name=s["costume_name"],
+                    bond_bonuses=s["bond_bonuses"],
+                )
+            )
             new_indices.append(i)
-            new_rank_children.append(_make_bond_rank_input(
-                i, costume_name=s["costume_name"],
-            ))
+            new_rank_children.append(
+                _make_bond_rank_input(
+                    i,
+                    costume_name=s["costume_name"],
+                )
+            )
         return new_children, new_indices, len(students), new_rank_children
 
     raise PreventUpdate

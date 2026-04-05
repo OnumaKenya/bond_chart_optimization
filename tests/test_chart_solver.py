@@ -19,6 +19,7 @@ from app.backend.presets import PRESETS
 # ヘルパー
 # ---------------------------------------------------------------------------
 
+
 def _compute_score_from_path(path, all_bond_bonuses):
     """経路からスコアを再計算する。"""
     num = len(path[0])
@@ -98,6 +99,7 @@ SMALL_CASES = [
 # テスト
 # ---------------------------------------------------------------------------
 
+
 class TestSidneyVsDp:
     """Sidney ソルバーのスコアが DP の厳密解と一致することを検証する。"""
 
@@ -113,9 +115,7 @@ class TestSidneyVsDp:
 
         path, sidney_score = solve(current_ranks, all_bond_bonuses)
 
-        assert sidney_score == dp_score, (
-            f"{desc}: Sidney={sidney_score}, DP={dp_score}"
-        )
+        assert sidney_score == dp_score, f"{desc}: Sidney={sidney_score}, DP={dp_score}"
 
     @pytest.mark.parametrize(
         "desc, current_ranks, all_bond_bonuses",
@@ -226,6 +226,7 @@ class TestCumulativeBonus:
 # プリセットを使ったテスト
 # ---------------------------------------------------------------------------
 
+
 def _preset_params():
     """PRESETS から (名前, ranks, bonuses) のパラメータリストを生成する。"""
     params = []
@@ -255,9 +256,7 @@ class TestPresets:
 
         path, sidney_score = solve(current_ranks, all_bond_bonuses)
 
-        assert sidney_score == dp_score, (
-            f"{name}: Sidney={sidney_score}, DP={dp_score}"
-        )
+        assert sidney_score == dp_score, f"{name}: Sidney={sidney_score}, DP={dp_score}"
 
     @pytest.mark.parametrize(
         "name, current_ranks, all_bond_bonuses",

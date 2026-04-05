@@ -75,7 +75,11 @@ def make_student_card(
                         },
                     ),
                 ],
-                style={"display": "flex", "alignItems": "center", "marginBottom": "8px"},
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "marginBottom": "8px",
+                },
             ),
             # 絆ボーナス入力行
             html.Div(
@@ -95,7 +99,9 @@ def make_student_card(
     )
 
 
-def _make_bond_rank_input(index: int, *, costume_name: str = "", value: int = 20) -> html.Div:
+def _make_bond_rank_input(
+    index: int, *, costume_name: str = "", value: int = 20
+) -> html.Div:
     """衣装ごとの現在の絆ランク入力欄を1つ生成する。"""
     return html.Div(
         [
@@ -114,7 +120,12 @@ def _make_bond_rank_input(index: int, *, costume_name: str = "", value: int = 20
                 style={"width": "60px", "textAlign": "center"},
             ),
         ],
-        style={"display": "flex", "flexDirection": "column", "alignItems": "center", "gap": "4px"},
+        style={
+            "display": "flex",
+            "flexDirection": "column",
+            "alignItems": "center",
+            "gap": "4px",
+        },
     )
 
 
@@ -142,11 +153,20 @@ def create_layout() -> html.Div:
                                 },
                             ),
                         ],
-                        style={"marginLeft": "auto", "display": "flex", "alignItems": "center", "gap": "12px"},
+                        style={
+                            "marginLeft": "auto",
+                            "display": "flex",
+                            "alignItems": "center",
+                            "gap": "12px",
+                        },
                     ),
                 ],
                 className="page-header",
-                style={"display": "flex", "alignItems": "center", "marginBottom": "16px"},
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "marginBottom": "16px",
+                },
             ),
             # マニュアルモーダル
             html.Div(
@@ -176,7 +196,9 @@ def create_layout() -> html.Div:
                                 "marginBottom": "12px",
                             },
                         ),
-                        dcc.Markdown(_MANUAL_MD, style={"overflowY": "auto", "flex": "1"}),
+                        dcc.Markdown(
+                            _MANUAL_MD, style={"overflowY": "auto", "flex": "1"}
+                        ),
                     ],
                     className="manual-modal-content",
                 ),
@@ -195,7 +217,10 @@ def create_layout() -> html.Div:
                                     html.Strong("プリセット"),
                                     dcc.Dropdown(
                                         id="preset-dropdown",
-                                        options=[{"label": name, "value": name} for name in PRESETS],
+                                        options=[
+                                            {"label": name, "value": name}
+                                            for name in PRESETS
+                                        ],
                                         placeholder="選択...",
                                         style={"marginTop": "6px"},
                                     ),
@@ -242,19 +267,31 @@ def create_layout() -> html.Div:
                             ),
                             html.Div(
                                 [
-                                    html.Button("+ 衣装追加", id="add-student-btn", n_clicks=0),
+                                    html.Button(
+                                        "+ 衣装追加", id="add-student-btn", n_clicks=0
+                                    ),
                                 ],
                                 style={"marginBottom": "16px"},
                             ),
                             # 現在の絆ランク入力
                             html.Div(
                                 [
-                                    html.Strong("現在の絆ランク", style={"marginBottom": "8px", "display": "block"}),
+                                    html.Strong(
+                                        "現在の絆ランク",
+                                        style={
+                                            "marginBottom": "8px",
+                                            "display": "block",
+                                        },
+                                    ),
                                     html.Div(
                                         id="bond-rank-container",
                                         children=[_make_bond_rank_input(0)],
                                         className="bond-rank-row",
-                                        style={"display": "flex", "gap": "8px", "flexWrap": "wrap"},
+                                        style={
+                                            "display": "flex",
+                                            "gap": "8px",
+                                            "flexWrap": "wrap",
+                                        },
                                     ),
                                 ],
                                 style={
@@ -283,7 +320,11 @@ def create_layout() -> html.Div:
                                 },
                             ),
                             # 計算結果表示エリア
-                            html.Div(id="chart-result", className="chart-result-area", style={"marginTop": "16px"}),
+                            html.Div(
+                                id="chart-result",
+                                className="chart-result-area",
+                                style={"marginTop": "16px"},
+                            ),
                         ],
                         style={"flex": "1", "minWidth": "0"},
                     ),
@@ -297,5 +338,10 @@ def create_layout() -> html.Div:
             dcc.Store(id="solver-inputs"),
         ],
         className="page-container",
-        style={"maxWidth": "1200px", "margin": "0 auto", "padding": "20px", "fontFamily": "sans-serif"},
+        style={
+            "maxWidth": "1200px",
+            "margin": "0 auto",
+            "padding": "20px",
+            "fontFamily": "sans-serif",
+        },
     )

@@ -176,14 +176,14 @@ def summarize_path(path: list[tuple[int, ...]], costume_names: list[str]) -> lis
         best_end = i + 1
 
         for pat_len in range(1, min(4, len(changes) - i + 1)):
-            pattern = changes[i:i + pat_len]
+            pattern = changes[i : i + pat_len]
             # このパターンが何回繰り返されるか
             j = i + pat_len
-            while j + pat_len <= len(changes) and changes[j:j + pat_len] == pattern:
+            while j + pat_len <= len(changes) and changes[j : j + pat_len] == pattern:
                 j += pat_len
             # 末尾の不完全な繰り返しも含める
-            remaining = changes[j:j + pat_len]
-            if remaining == pattern[:len(remaining)] and len(remaining) > 0:
+            remaining = changes[j : j + pat_len]
+            if remaining == pattern[: len(remaining)] and len(remaining) > 0:
                 j += len(remaining)
             total = j - i
             if total > best_end - i:
@@ -206,7 +206,12 @@ def summarize_path(path: list[tuple[int, ...]], costume_names: list[str]) -> lis
     # 隣接する同一衣装の単一パターンをマージ
     merged: list[tuple[list[int], int, int]] = []
     for g in groups:
-        if merged and len(g[0]) == 1 and len(merged[-1][0]) == 1 and g[0] == merged[-1][0]:
+        if (
+            merged
+            and len(g[0]) == 1
+            and len(merged[-1][0]) == 1
+            and g[0] == merged[-1][0]
+        ):
             prev = merged[-1]
             merged[-1] = (prev[0], prev[1], g[2])
         else:
@@ -242,7 +247,9 @@ def summarize_path(path: list[tuple[int, ...]], costume_names: list[str]) -> lis
                     if to_state[c] - from_state[c] == 1:
                         parts.append(f"{costume_names[c]} {to_state[c]}")
                     else:
-                        parts.append(f"{costume_names[c]} {from_state[c]} → {to_state[c]}")
+                        parts.append(
+                            f"{costume_names[c]} {from_state[c]} → {to_state[c]}"
+                        )
             desc = f"[{rotating}] {count_str} " + ", ".join(parts)
 
         summary.append({"description": desc, "from": from_state, "to": to_state})
