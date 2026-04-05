@@ -6,11 +6,6 @@ bond_bonuses の順序: 絆2~5, 6~10, 11~15, 16~20, 21~30, 31~40, 41~50
 """
 
 PRESETS: dict[str, list[dict]] = {
-    "アリス": [
-        {"costume_name": "通常", "bond_bonuses": [3, 5, 7, 9, 3, 4, 7]},
-        {"costume_name": "メイド", "bond_bonuses": [4, 6, 8, 10, 3, 4, 6]},
-        {"costume_name": "臨戦", "bond_bonuses": [4, 6, 8, 10, 2, 4, 6]},
-    ],
     "ワカモ": [
         {"costume_name": "通常", "bond_bonuses": [3, 5, 7, 9, 2, 3, 6]},
         {"costume_name": "水着", "bond_bonuses": [4, 6, 7, 9, 2, 4, 6]},
@@ -42,14 +37,22 @@ PRESETS: dict[str, list[dict]] = {
         {"costume_name": "通常", "bond_bonuses": [3, 4, 6, 7, 2, 3, 5]},
         {"costume_name": "水着", "bond_bonuses": [2, 4, 5, 6, 1, 2, 4]},
     ],
+    "アリス": [
+        {"costume_name": "通常", "bond_bonuses": [3, 5, 7, 9, 3, 4, 7]},
+        {"costume_name": "メイド", "bond_bonuses": [4, 6, 8, 10, 3, 4, 6]},
+        {"costume_name": "臨戦", "bond_bonuses": [4, 6, 8, 10, 2, 4, 6]},
+    ],
     "シロコ": [
         {"costume_name": "通常", "bond_bonuses": [3, 4, 6, 7, 2, 3, 5]},
         {"costume_name": "ライディング", "bond_bonuses": [3, 4, 6, 7, 2, 3, 5]},
         {"costume_name": "水着", "bond_bonuses": [3, 5, 6, 8, 2, 3, 5]},
     ],
-    
     "ミサキ": [
         {"costume_name": "通常", "bond_bonuses": [5, 8, 11, 14, 4, 5, 9]},
         {"costume_name": "水着", "bond_bonuses": [3, 5, 6, 8, 2, 3, 5]},
+    ],
+    "ノア": [
+        {"costume_name": "通常", "bond_bonuses": [1, 2, 2, 3, 1, 1, 2]},
+        {"costume_name": "パジャマ", "bond_bonuses": [1, 2, 3, 4, 1, 1, 2]},
     ],
 }
