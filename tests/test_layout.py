@@ -175,9 +175,7 @@ class TestMakeStudentCard:
     def test_bond_default_zero(self):
         card = make_student_card(0)
         for i in range(len(BOND_RANGES)):
-            inputs = _find_by_id(
-                card, {"type": "bond", "range_idx": i, "index": 0}
-            )
+            inputs = _find_by_id(card, {"type": "bond", "range_idx": i, "index": 0})
             assert len(inputs) == 1
             assert inputs[0].value == 0
 
@@ -185,9 +183,7 @@ class TestMakeStudentCard:
         bonuses = [1, 2, 3, 4, 5, 6, 7]
         card = make_student_card(1, bond_bonuses=bonuses)
         for i, expected in enumerate(bonuses):
-            inputs = _find_by_id(
-                card, {"type": "bond", "range_idx": i, "index": 1}
-            )
+            inputs = _find_by_id(card, {"type": "bond", "range_idx": i, "index": 1})
             assert inputs[0].value == expected
 
     def test_has_remove_button(self):
@@ -244,7 +240,9 @@ class TestMakeBondRankInput:
 
 
 class TestDefaultCostumeName:
-    @pytest.mark.parametrize("index, expected", [(0, "衣装1"), (1, "衣装2"), (9, "衣装10")])
+    @pytest.mark.parametrize(
+        "index, expected", [(0, "衣装1"), (1, "衣装2"), (9, "衣装10")]
+    )
     def test_names(self, index, expected):
         assert _default_costume_name(index) == expected
 
@@ -271,9 +269,7 @@ class TestPresetsIntegration:
             assert inputs[0].value == s["costume_name"]
             # 絆ボーナスが正しい
             for ri, val in enumerate(s["bond_bonuses"]):
-                bond = _find_by_id(
-                    card, {"type": "bond", "range_idx": ri, "index": i}
-                )
+                bond = _find_by_id(card, {"type": "bond", "range_idx": ri, "index": i})
                 assert bond[0].value == val
 
     @pytest.mark.parametrize("name", list(PRESETS.keys()))
