@@ -137,6 +137,26 @@ def create_layout() -> html.Div:
                     html.H1("絆上げ優先度計算機", style={"marginBottom": "0"}),
                     html.Div(
                         [
+                            html.Span(
+                                [
+                                    "不具合・要望報告は",
+                                    html.A(
+                                        "こちら",
+                                        href="https://x.com/yankeiori",
+                                        target="_blank",
+                                        rel="noopener noreferrer",
+                                        style={
+                                            "color": "#4a90d9",
+                                            "textDecoration": "underline",
+                                        },
+                                    ),
+                                    "まで",
+                                ],
+                                style={
+                                    "fontSize": "0.85rem",
+                                    "whiteSpace": "nowrap",
+                                },
+                            ),
                             html.Button(
                                 "📖 マニュアル",
                                 id="open-manual-btn",
