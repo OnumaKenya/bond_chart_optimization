@@ -61,6 +61,12 @@ input[type="number"] {
     to { transform: rotate(360deg); }
 }
 
+/* ── PC: 絆入力を7列1行に固定 ── */
+.bond-fields {
+    display: grid !important;
+    grid-template-columns: repeat(7, 1fr) !important;
+}
+
 /* ── モバイル対応 ── */
 @media (max-width: 768px) {
     /* 2カラム → 縦積み */
@@ -73,6 +79,11 @@ input[type="number"] {
     .sidebar {
         width: 100% !important;
         position: static !important;
+    }
+
+    /* メインコンテンツを横幅いっぱいに */
+    .main-columns > div:last-child {
+        width: 100% !important;
     }
 
     /* ページ全体のパディングを縮小 */
@@ -103,10 +114,10 @@ input[type="number"] {
         font-size: 0.9rem !important;
     }
 
-    /* 衣装カード内の絆入力をグリッド化 */
+    /* 衣装カード内の絆入力: 4列固定 → 4+3 の2行 */
     .bond-fields {
         display: grid !important;
-        grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)) !important;
+        grid-template-columns: repeat(4, 1fr) !important;
         gap: 6px !important;
     }
     .bond-fields > div {
@@ -219,6 +230,6 @@ input[type="number"] {
         font-size: 1.1rem !important;
     }
     .bond-fields {
-        grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)) !important;
+        grid-template-columns: repeat(4, 1fr) !important;
     }
 }

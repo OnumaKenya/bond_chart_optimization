@@ -434,12 +434,15 @@ function _solver_calcChartSync(
             textAlign: "center",
             padding: "4px 8px",
             fontSize: "0.9rem",
+            minWidth: "60px",
+            whiteSpace: "nowrap",
+            overflow: "visible",
         },
         style_cell_conditional: [
             {
                 if: { column_id: "description" },
                 textAlign: "left",
-                minWidth: "200px",
+                minWidth: "180px",
             },
         ],
         style_header: {
