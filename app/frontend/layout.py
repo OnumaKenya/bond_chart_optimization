@@ -350,6 +350,97 @@ def create_layout() -> html.Div:
                                     "marginBottom": "16px",
                                 },
                             ),
+                            # 高度な設定（折りたたみ）
+                            html.Details(
+                                [
+                                    html.Summary(
+                                        "高度な設定",
+                                        style={
+                                            "cursor": "pointer",
+                                            "fontWeight": "bold",
+                                            "marginBottom": "8px",
+                                        },
+                                    ),
+                                    html.Div(
+                                        [
+                                            # 衣装優先度
+                                            html.Div(
+                                                [
+                                                    html.Strong(
+                                                        "衣装優先度（タイブレーク）",
+                                                        style={
+                                                            "display": "block",
+                                                            "marginBottom": "6px",
+                                                        },
+                                                    ),
+                                                    html.P(
+                                                        "上が高優先。同スコア時に優先度が高い衣装を先にします。",
+                                                        style={
+                                                            "fontSize": "0.8rem",
+                                                            "color": "#666",
+                                                            "margin": "0 0 8px 0",
+                                                        },
+                                                    ),
+                                                    html.Div(
+                                                        id="costume-priority-container",
+                                                        style={
+                                                            "display": "flex",
+                                                            "flexDirection": "column",
+                                                            "gap": "4px",
+                                                        },
+                                                    ),
+                                                ],
+                                                style={"marginBottom": "16px"},
+                                            ),
+                                            # 絆50ペナルティ
+                                            html.Div(
+                                                [
+                                                    html.Strong(
+                                                        "絆50到達ペナルティ",
+                                                        style={
+                                                            "display": "block",
+                                                            "marginBottom": "6px",
+                                                        },
+                                                    ),
+                                                    html.P(
+                                                        "絆50到達時のボーナス減衰率。1に近いほど50到達を後回しにします。",
+                                                        style={
+                                                            "fontSize": "0.8rem",
+                                                            "color": "#666",
+                                                            "margin": "0 0 8px 0",
+                                                        },
+                                                    ),
+                                                    dcc.Slider(
+                                                        id="bond50-penalty",
+                                                        min=0,
+                                                        max=1,
+                                                        step=0.05,
+                                                        value=0,
+                                                        marks={
+                                                            0: "0",
+                                                            0.25: "0.25",
+                                                            0.5: "0.5",
+                                                            0.75: "0.75",
+                                                            1: "1",
+                                                        },
+                                                        tooltip={
+                                                            "placement": "bottom",
+                                                            "always_visible": True,
+                                                        },
+                                                    ),
+                                                ],
+                                            ),
+                                        ],
+                                        style={
+                                            "padding": "12px",
+                                            "border": "1px solid #ddd",
+                                            "borderRadius": "8px",
+                                            "background": "#f9f9ff",
+                                        },
+                                    ),
+                                ],
+                                style={"marginBottom": "16px"},
+                            ),
                             # チャート計算ボタン
                             html.Div(
                                 html.Button(
@@ -387,6 +478,7 @@ def create_layout() -> html.Div:
             dcc.Store(id="student-indices", data=[0]),
             dcc.Store(id="next-student-index", data=1),
             dcc.Store(id="solver-inputs"),
+            dcc.Store(id="costume-priority-order", data=[{"idx": 0, "name": "衣装1"}]),
         ],
         className="page-container",
         style={

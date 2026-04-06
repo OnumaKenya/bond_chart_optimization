@@ -68,9 +68,11 @@ function _solver_cumulativeBonus(bondBonuses) {
  *
  * @param {number[]} currentRanks - 各衣装の現在ランク
  * @param {number[][]} allBondBonuses - 各衣装の bond_bonuses (長さ7)
- * @returns {{ path: number[][], totalScore: number }}
+ * @param {Object} priorityMap - ソルバー内index → 優先度 (小さいほど優先)
+ * @param {number} bond50Penalty - 絆50到達ペナルティ (0~1)
+ * @returns {{ path: number[][], totalScore: number, cumPerCostume: number[][] }}
  */
-function _solver_solveSidney(currentRanks, allBondBonuses) {
+function _solver_solveSidney(currentRanks, allBondBonuses, priorityMap, bond50Penalty) {
     var n = currentRanks.length;
     var cumPerCostume = allBondBonuses.map(function (bb) {
         return _solver_cumulativeBonus(bb);
@@ -85,12 +87,16 @@ function _solver_solveSidney(currentRanks, allBondBonuses) {
         for (var r = currentRanks[ci]; r < 50; r++) {
             var w = _solver_BOND_EXP_PER_LEVEL[r - 1];
             var p = cumPerCostume[ci][r + 1] - cumPerCostume[ci][r];
+            // 絆50ペナルティ: ランク49→50のジョブのボーナスを減衰
+            if (r === 49 && bond50Penalty > 0) {
+                p = Math.round(p * (1 - bond50Penalty));
+            }
             var newBlock = { p: p, w: w, jobs: [{ ci: ci, r: r }] };
 
-            // top の p/w < new の p/w ならマージ (整数比較で除算回避)
+            // top の p/w <= new の p/w ならマージ (等価も含めて同衣装を連続させる)
             while (stack.length > 0) {
                 var top = stack[stack.length - 1];
-                if (top.p * newBlock.w < newBlock.p * top.w) {
+                if (top.p * newBlock.w <= newBlock.p * top.w) {
                     stack.pop();
                     newBlock = {
                         p: top.p + newBlock.p,
@@ -114,6 +120,12 @@ function _solver_solveSidney(currentRanks, allBondBonuses) {
         var rhs = b.p * a.w;
         if (lhs > rhs) return -1;
         if (lhs < rhs) return 1;
+        // タイブレーク: 衣装優先度順
+        var aPri = priorityMap[a.jobs[0].ci];
+        var bPri = priorityMap[b.jobs[0].ci];
+        if (aPri !== undefined && bPri !== undefined && aPri !== bPri) {
+            return aPri - bPri;
+        }
         return 0;
     });
 
@@ -131,6 +143,7 @@ function _solver_solveSidney(currentRanks, allBondBonuses) {
         for (var ji = 0; ji < jobs.length; ji++) {
             var job = jobs[ji];
             var exp = _solver_BOND_EXP_PER_LEVEL[job.r - 1];
+            // スコア計算には実際のボーナス値を使用（ペナルティの影響を受けない）
             var delta = cumPerCostume[job.ci][job.r + 1] - cumPerCostume[job.ci][job.r];
             totalScore += exp * currentBonus;
             state[job.ci] = job.r + 1;
@@ -140,7 +153,7 @@ function _solver_solveSidney(currentRanks, allBondBonuses) {
     }
 
     console.debug("[Sidney] goal score:", totalScore);
-    return { path: path, totalScore: totalScore };
+    return { path: path, totalScore: totalScore, cumPerCostume: cumPerCostume };
 }
 
 /* ------------------------------------------------------------------ */
@@ -284,7 +297,7 @@ function _solver_summarizePath(path, costumeNames) {
             desc = "[" + rotating + "] " + countStr + " " + parts.join(", ");
         }
 
-        summary.push({ description: desc, from: fromState, to: toState });
+        summary.push({ description: desc, from: fromState, to: toState, start: start, end: end });
     }
 
     return summary;
@@ -335,7 +348,8 @@ function _solver_spinnerComponent() {
 /* ------------------------------------------------------------------ */
 
 function _solver_calcChartSync(
-    rankValues, rankIds, bondValues, bondIds, costumeValues, costumeIds
+    rankValues, rankIds, bondValues, bondIds, costumeValues, costumeIds,
+    costumePriorityOrder, bond50Penalty
 ) {
     // --- データ組み立て ---
     var idxOrder = costumeIds.map(function (id) {
@@ -365,9 +379,24 @@ function _solver_calcChartSync(
         return bondMap[idx];
     });
 
+    // --- 衣装優先度マップ構築 (衣装元index → ソルバー内index) ---
+    var priorityMap = {};
+    if (costumePriorityOrder) {
+        for (var pi = 0; pi < costumePriorityOrder.length; pi++) {
+            var origIdx = costumePriorityOrder[pi];
+            var solverIdx = idxOrder.indexOf(origIdx);
+            if (solverIdx !== -1) {
+                priorityMap[solverIdx] = pi;
+            }
+        }
+    }
+
     // --- Sidney 分解ソルバー実行 ---
-    var result = _solver_solveSidney(currentRanks, allBondBonuses);
+    var result = _solver_solveSidney(
+        currentRanks, allBondBonuses, priorityMap, bond50Penalty || 0
+    );
     var path = result.path;
+    var cumPerCostume = result.cumPerCostume;
 
     if (!path || path.length === 0) {
         return _solver_h("P", {
@@ -387,9 +416,13 @@ function _solver_calcChartSync(
         name: "\u7d46\u4e0a\u3052\u512a\u5148\u5ea6",
         id: "description",
     });
+    summaryColumns.push({
+        name: "#",
+        id: "row_idx",
+    });
 
-    var summaryData = summary.map(function (s) {
-        var row = { description: s.description };
+    var summaryData = summary.map(function (s, idx) {
+        var row = { description: s.description, row_idx: idx + 1 };
         for (var ci = 0; ci < costumeNames.length; ci++) {
             row["c" + ci] = s.to[ci];
         }
@@ -443,6 +476,12 @@ function _solver_calcChartSync(
                 if: { column_id: "description" },
                 textAlign: "left",
                 minWidth: "180px",
+            },
+            {
+                if: { column_id: "row_idx" },
+                minWidth: "30px",
+                maxWidth: "40px",
+                color: "#888",
             },
         ],
         style_header: {
@@ -535,6 +574,112 @@ function _solver_calcChartSync(
         rows: detailCsvRows,
     });
 
+    // --- 経験値 vs 絆ボーナス合計グラフ ---
+    var cumExpData = [0]; // 累積経験値
+    var totalBonusData = []; // 絆ボーナス合計値
+
+    // 初期状態の絆ボーナス合計
+    var initBonus = 0;
+    for (var gi = 0; gi < costumeNames.length; gi++) {
+        initBonus += cumPerCostume[gi][path[0][gi]];
+    }
+    totalBonusData.push(initBonus);
+
+    for (var si = 1; si < path.length; si++) {
+        // どの衣装が上がったか特定
+        for (var sci = 0; sci < costumeNames.length; sci++) {
+            if (path[si][sci] !== path[si - 1][sci]) {
+                var prevRank = path[si - 1][sci];
+                cumExpData.push(
+                    cumExpData[si - 1] + _solver_BOND_EXP_PER_LEVEL[prevRank - 1]
+                );
+                break;
+            }
+        }
+        var bonus = 0;
+        for (var bci = 0; bci < costumeNames.length; bci++) {
+            bonus += cumPerCostume[bci][path[si][bci]];
+        }
+        totalBonusData.push(bonus);
+    }
+
+    // 要約チャートの各行に対応する縦線
+    var vlineShapes = [];
+    var vlineAnnotations = [];
+    for (var vi = 0; vi < summary.length; vi++) {
+        var xPos = cumExpData[summary[vi].end];
+        if (xPos === undefined) continue;
+        vlineShapes.push({
+            type: "line",
+            x0: xPos, x1: xPos,
+            y0: 0, y1: 1,
+            yref: "paper",
+            line: { color: "rgba(150,150,150,0.5)", width: 1, dash: "dot" },
+        });
+        vlineAnnotations.push({
+            x: xPos,
+            y: 1,
+            yref: "paper",
+            text: String(vi + 1),
+            showarrow: false,
+            font: { size: 10, color: "#888" },
+            yanchor: "bottom",
+        });
+    }
+
+    var graphFigure = {
+        data: [
+            {
+                x: cumExpData,
+                y: totalBonusData,
+                type: "scatter",
+                mode: "lines+markers",
+                marker: { size: 4, color: "#2ecc71" },
+                line: { color: "#2ecc71", width: 2 },
+                fill: "tozeroy",
+                fillcolor: "rgba(46,204,113,0.15)",
+                fillgradient: {
+                    type: "vertical",
+                    colorscale: [
+                        [0, "rgba(46,204,113,0)"],
+                        [1, "rgba(46,204,113,0.3)"],
+                    ],
+                },
+            },
+        ],
+        layout: {
+            title: { text: "経験値 vs 絆ボーナス合計値" },
+            xaxis: { title: { text: "累積経験値" } },
+            yaxis: { title: { text: "絆ボーナス合計値" } },
+            margin: { t: 40, r: 20, b: 50, l: 60 },
+            height: 350,
+            shapes: vlineShapes,
+            annotations: vlineAnnotations,
+        },
+    };
+
+    var graphComponent = {
+        namespace: "dash_core_components",
+        type: "Graph",
+        props: {
+            figure: graphFigure,
+            config: {
+                modeBarButtonsToRemove: [
+                    "select2d",
+                    "lasso2d",
+                    "autoScale2d",
+                ],
+                displaylogo: false,
+                toImageButtonOptions: {
+                    format: "png",
+                    filename: "bond_bonus_graph",
+                    scale: 2,
+                },
+            },
+            style: { marginTop: "16px" },
+        },
+    };
+
     // --- 結果コンポーネント ---
     var btnStyle = {
         padding: "6px 16px",
@@ -588,6 +733,20 @@ function _solver_calcChartSync(
             _solver_h("Div", {
                 children: summaryTable,
                 id: "summary-table-container",
+            }),
+            _solver_h("Details", {
+                children: [
+                    _solver_h("Summary", {
+                        children: "\u7d4c\u9a13\u5024 vs \u7d46\u30dc\u30fc\u30ca\u30b9\u30b0\u30e9\u30d5",
+                        style: {
+                            cursor: "pointer",
+                            marginTop: "16px",
+                            marginBottom: "8px",
+                            fontWeight: "bold",
+                        },
+                    }),
+                    graphComponent,
+                ],
             }),
             _solver_h("Details", {
                 children: [
@@ -653,12 +812,23 @@ window.dash_clientside.solver = {
         bondValues,
         bondIds,
         costumeValues,
-        costumeIds
+        costumeIds,
+        costumePriorityOrder,
+        bond50Penalty
     ) {
         if (!n_clicks) return [
             window.dash_clientside.no_update,
             window.dash_clientside.no_update,
         ];
+
+        // Store から優先度順序を取得
+        var priorityOrder = [];
+        if (costumePriorityOrder) {
+            for (var i = 0; i < costumePriorityOrder.length; i++) {
+                var entry = costumePriorityOrder[i];
+                priorityOrder.push(typeof entry === "object" ? entry.idx : entry);
+            }
+        }
 
         var inputs = {
             rankValues: rankValues,
@@ -667,6 +837,8 @@ window.dash_clientside.solver = {
             bondIds: bondIds,
             costumeValues: costumeValues,
             costumeIds: costumeIds,
+            costumePriorityOrder: priorityOrder,
+            bond50Penalty: bond50Penalty || 0,
         };
 
         return [_solver_spinnerComponent(), inputs];
@@ -687,7 +859,9 @@ window.dash_clientside.solver = {
                         solverInputs.bondValues,
                         solverInputs.bondIds,
                         solverInputs.costumeValues,
-                        solverInputs.costumeIds
+                        solverInputs.costumeIds,
+                        solverInputs.costumePriorityOrder,
+                        solverInputs.bond50Penalty
                     )
                 );
             }, 50);

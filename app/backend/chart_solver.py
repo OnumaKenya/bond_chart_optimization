@@ -70,11 +70,24 @@ def solve_dp(current_ranks: list[int], all_bond_bonuses: list[list[int]]):
     return dp
 
 
-def solve(current_ranks: list[int], all_bond_bonuses: list[list[int]]):
+def solve(
+    current_ranks: list[int],
+    all_bond_bonuses: list[list[int]],
+    *,
+    costume_priority: list[int] | None = None,
+    bond50_penalty: float = 0,
+):
     """Sidney 分解でチャートを計算する。
 
     問題を 1|chains|max Σw_jC_j に帰着し、Sidney 分解により
     O(T log T) で厳密な最適解を求める（T = 総ステップ数）。
+
+    Parameters
+    ----------
+    costume_priority : list[int] | None
+        衣装インデックスの優先順リスト（タイブレーク用）
+    bond50_penalty : int
+        絆50到達時のペナルティ値
 
     Returns
     -------
@@ -86,6 +99,11 @@ def solve(current_ranks: list[int], all_bond_bonuses: list[list[int]]):
     num_costumes = len(current_ranks)
     cum_per_costume = [_cumulative_bonus(bb) for bb in all_bond_bonuses]
 
+    # 衣装優先度マップ
+    priority_map: dict[int, int] = {}
+    if costume_priority:
+        priority_map = {ci: pos for pos, ci in enumerate(costume_priority)}
+
     # 各衣装のジョブチェーンを構築
     # ジョブ: (w=exp, p=δ, costume_idx, rank)
     chains: list[list[tuple[int, int, int, int]]] = []
@@ -94,6 +112,9 @@ def solve(current_ranks: list[int], all_bond_bonuses: list[list[int]]):
         for r in range(current_ranks[i], 50):
             w = BOND_EXP_PER_LEVEL[r - 1]
             p = cum_per_costume[i][r + 1] - cum_per_costume[i][r]
+            # 絆50ペナルティ: ランク49→50のジョブのボーナスを減衰
+            if r == 49 and bond50_penalty > 0:
+                p = round(p * (1 - bond50_penalty))
             chain.append((w, p, i, r))
         chains.append(chain)
 
@@ -109,8 +130,8 @@ def solve(current_ranks: list[int], all_bond_bonuses: list[list[int]]):
             while stack:
                 top_p, top_w, top_jobs = stack[-1]
                 new_p, new_w = new_block[0], new_block[1]
-                # top の p/w < new の p/w ならマージ (整数比較で除算回避)
-                if top_p * new_w < new_p * top_w:
+                # top の p/w <= new の p/w ならマージ (等価も含めて同衣装を連続させる)
+                if top_p * new_w <= new_p * top_w:
                     stack.pop()
                     new_block = (top_p + new_p, top_w + new_w, top_jobs + new_block[2])
                 else:
@@ -126,6 +147,12 @@ def solve(current_ranks: list[int], all_bond_bonuses: list[list[int]]):
             return -1
         if lhs < rhs:
             return 1
+        # タイブレーク: 衣装優先度順
+        if priority_map:
+            a_pri = priority_map.get(a[2][0][2], len(priority_map))
+            b_pri = priority_map.get(b[2][0][2], len(priority_map))
+            if a_pri != b_pri:
+                return -1 if a_pri < b_pri else 1
         return 0
 
     all_blocks.sort(key=functools.cmp_to_key(cmp_blocks))
@@ -137,10 +164,13 @@ def solve(current_ranks: list[int], all_bond_bonuses: list[list[int]]):
     current_bonus = sum(cum_per_costume[i][state[i]] for i in range(num_costumes))
 
     for _block_p, _block_w, jobs in all_blocks:
-        for w, p, ci, r in jobs:
-            total_score += w * current_bonus
+        for _w, _p, ci, r in jobs:
+            exp = BOND_EXP_PER_LEVEL[r - 1]
+            # スコア計算には実際のボーナス値を使用（ペナルティの影響を受けない）
+            delta = cum_per_costume[ci][r + 1] - cum_per_costume[ci][r]
+            total_score += exp * current_bonus
             state[ci] = r + 1
-            current_bonus += p
+            current_bonus += delta
             path.append(tuple(state))
 
     return path, total_score
