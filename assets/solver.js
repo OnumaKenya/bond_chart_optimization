@@ -78,6 +78,17 @@ function _solver_solveSidney(currentRanks, allBondBonuses, priorityMap, bond50Pe
         return _solver_cumulativeBonus(bb);
     });
 
+    // 絆50ペナルティ: 全衣装の絆50ボーナスの最大値から減算量を決定
+    var penalty50 = 0;
+    if (bond50Penalty > 0) {
+        var maxP50 = 0;
+        for (var pi = 0; pi < n; pi++) {
+            var p50 = cumPerCostume[pi][50] - cumPerCostume[pi][49];
+            if (p50 > maxP50) maxP50 = p50;
+        }
+        penalty50 = Math.round(maxP50 * bond50Penalty);
+    }
+
     // 各衣装のジョブチェーンを構築し Sidney 分解
     // ブロック: { p: number, w: number, jobs: {ci, r}[] }
     var allBlocks = [];
@@ -87,9 +98,9 @@ function _solver_solveSidney(currentRanks, allBondBonuses, priorityMap, bond50Pe
         for (var r = currentRanks[ci]; r < 50; r++) {
             var w = _solver_BOND_EXP_PER_LEVEL[r - 1];
             var p = cumPerCostume[ci][r + 1] - cumPerCostume[ci][r];
-            // 絆50ペナルティ: ランク49→50のジョブのボーナスを減衰
-            if (r === 49 && bond50Penalty > 0) {
-                p = Math.round(p * (1 - bond50Penalty));
+            // 絆50ペナルティ: ランク49→50のジョブに一律減算（負にならない）
+            if (r === 49 && penalty50 > 0) {
+                p = Math.max(0, p - penalty50);
             }
             var newBlock = { p: p, w: w, jobs: [{ ci: ci, r: r }] };
 

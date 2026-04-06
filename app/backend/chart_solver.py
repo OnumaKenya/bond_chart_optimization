@@ -104,6 +104,14 @@ def solve(
     if costume_priority:
         priority_map = {ci: pos for pos, ci in enumerate(costume_priority)}
 
+    # 絆50ペナルティ: 全衣装の絆50ボーナスの最大値から減算量を決定
+    penalty50 = 0
+    if bond50_penalty > 0:
+        max_p50 = max(
+            cum_per_costume[i][50] - cum_per_costume[i][49] for i in range(num_costumes)
+        )
+        penalty50 = round(max_p50 * bond50_penalty)
+
     # 各衣装のジョブチェーンを構築
     # ジョブ: (w=exp, p=δ, costume_idx, rank)
     chains: list[list[tuple[int, int, int, int]]] = []
@@ -112,9 +120,9 @@ def solve(
         for r in range(current_ranks[i], 50):
             w = BOND_EXP_PER_LEVEL[r - 1]
             p = cum_per_costume[i][r + 1] - cum_per_costume[i][r]
-            # 絆50ペナルティ: ランク49→50のジョブのボーナスを減衰
-            if r == 49 and bond50_penalty > 0:
-                p = round(p * (1 - bond50_penalty))
+            # 絆50ペナルティ: ランク49→50のジョブに一律減算（負にならない）
+            if r == 49 and penalty50 > 0:
+                p = max(0, p - penalty50)
             chain.append((w, p, i, r))
         chains.append(chain)
 
