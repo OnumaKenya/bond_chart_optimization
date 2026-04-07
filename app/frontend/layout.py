@@ -4,7 +4,7 @@ from pathlib import Path
 from dash import html, dcc
 
 from app.backend.student import BOND_RANGES
-from app.backend.presets import PRESETS
+from app.backend.user_presets import get_all_presets_for_dropdown
 
 # PyInstaller バンドル時は _MEIPASS、通常時はプロジェクトルート
 if getattr(sys, "frozen", False):
@@ -252,10 +252,7 @@ def create_layout() -> html.Div:
                                     html.Strong("プリセット"),
                                     dcc.Dropdown(
                                         id="preset-dropdown",
-                                        options=[
-                                            {"label": name, "value": name}
-                                            for name in PRESETS
-                                        ],
+                                        options=get_all_presets_for_dropdown(),
                                         placeholder="選択...",
                                         style={"marginTop": "6px"},
                                     ),
@@ -281,6 +278,49 @@ def create_layout() -> html.Div:
                                     "border": "1px solid #ddd",
                                     "borderRadius": "8px",
                                     "background": "#f5f5ff",
+                                },
+                            ),
+                            # プリセット投稿
+                            html.Div(
+                                [
+                                    html.Strong("現在の入力データをプリセットとして投稿"),
+                                    dcc.Input(
+                                        id="submit-character-name",
+                                        type="text",
+                                        placeholder="生徒名を入力...",
+                                        style={
+                                            "width": "100%",
+                                            "marginTop": "6px",
+                                            "fontSize": "0.85rem",
+                                        },
+                                    ),
+                                    html.Button(
+                                        "投稿",
+                                        id="submit-preset-btn",
+                                        n_clicks=0,
+                                        style={
+                                            "marginTop": "8px",
+                                            "width": "100%",
+                                            "background": "#e67e22",
+                                            "color": "white",
+                                            "border": "none",
+                                            "borderRadius": "4px",
+                                            "padding": "6px 16px",
+                                            "cursor": "pointer",
+                                        },
+                                    ),
+                                    html.Div(
+                                        id="submit-feedback",
+                                        style={"marginTop": "6px", "fontSize": "0.8rem"},
+                                    ),
+                                ],
+                                className="submit-section",
+                                style={
+                                    "padding": "10px",
+                                    "border": "1px solid #ddd",
+                                    "borderRadius": "8px",
+                                    "background": "#fff8f0",
+                                    "marginTop": "12px",
                                 },
                             ),
                         ],
@@ -478,6 +518,7 @@ def create_layout() -> html.Div:
             dcc.Store(id="student-indices", data=[0]),
             dcc.Store(id="next-student-index", data=1),
             dcc.Store(id="solver-inputs"),
+            dcc.Store(id="submit-preset-status"),
             dcc.Store(id="costume-priority-order", data=[{"idx": 0, "name": "衣装1"}]),
         ],
         className="page-container",
