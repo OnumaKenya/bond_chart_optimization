@@ -78,4 +78,8 @@ PRESETS: dict[str, list[dict]] = {
         {"costume_name": "通常", "bond_bonuses": [2, 4, 5, 6, 2, 2, 4]},
         {"costume_name": "バンド", "bond_bonuses": [3, 4, 5, 7, 2, 2, 4]},
     ],
+    "ヒビキ": [
+        {"costume_name": "通常", "bond_bonuses": [2, 4, 5, 6, 2, 2, 4]},
+        {"costume_name": "応援団", "bond_bonuses": [7, 10, 13, 16, 4, 6, 11]},
+    ],
 }
