@@ -1,85 +1,26 @@
 """プリセット定義。
 
+data/presets.json から読み込む。
 各プリセットは生徒リスト。
 各生徒は {"costume_name": str, "bond_bonuses": [int x7]} の辞書。
 bond_bonuses の順序: 絆2~5, 6~10, 11~15, 16~20, 21~30, 31~40, 41~50
 """
 
-PRESETS: dict[str, list[dict]] = {
-    "ワカモ": [
-        {"costume_name": "通常", "bond_bonuses": [3, 5, 7, 9, 2, 3, 6]},
-        {"costume_name": "水着", "bond_bonuses": [4, 6, 7, 9, 2, 4, 6]},
-    ],
-    "ホシノ": [
-        {"costume_name": "通常", "bond_bonuses": [0, 0, 0, 0, 0, 0, 0]},
-        {"costume_name": "水着", "bond_bonuses": [2, 3, 4, 5, 1, 2, 3]},
-        {"costume_name": "臨戦", "bond_bonuses": [2, 3, 4, 5, 1, 2, 3]},
-    ],
-    "ミカ": [
-        {"costume_name": "通常", "bond_bonuses": [3, 4, 5, 7, 2, 3, 4]},
-        {"costume_name": "水着", "bond_bonuses": [3, 5, 6, 8, 2, 3, 5]},
-    ],
-    "ヒナ": [
-        {"costume_name": "通常", "bond_bonuses": [3, 4, 5, 6, 2, 2, 4]},
-        {"costume_name": "水着", "bond_bonuses": [3, 5, 6, 8, 2, 3, 5]},
-        {"costume_name": "ドレス", "bond_bonuses": [3, 5, 7, 9, 2, 3, 5]},
-    ],
-    "ネル": [
-        {"costume_name": "通常", "bond_bonuses": [2, 3, 4, 5, 1, 2, 3]},
-        {"costume_name": "バニー", "bond_bonuses": [2, 4, 5, 6, 1, 2, 3]},
-        {"costume_name": "制服", "bond_bonuses": [3, 5, 6, 8, 2, 3, 5]},
-    ],
-    "リオ": [
-        {"costume_name": "通常", "bond_bonuses": [2, 3, 4, 5, 1, 2, 3]},
-        {"costume_name": "臨戦", "bond_bonuses": [2, 3, 4, 5, 1, 2, 3]},
-    ],
-    "ナギサ": [
-        {"costume_name": "通常", "bond_bonuses": [3, 4, 6, 7, 2, 3, 5]},
-        {"costume_name": "水着", "bond_bonuses": [2, 4, 5, 6, 1, 2, 4]},
-    ],
-    "アリス": [
-        {"costume_name": "通常", "bond_bonuses": [3, 5, 7, 9, 3, 4, 7]},
-        {"costume_name": "メイド", "bond_bonuses": [4, 6, 8, 10, 3, 4, 6]},
-        {"costume_name": "臨戦", "bond_bonuses": [4, 6, 8, 10, 2, 4, 6]},
-    ],
-    "シロコ": [
-        {"costume_name": "通常", "bond_bonuses": [3, 4, 6, 7, 2, 3, 5]},
-        {"costume_name": "ライディング", "bond_bonuses": [3, 4, 6, 7, 2, 3, 5]},
-        {"costume_name": "水着", "bond_bonuses": [3, 5, 6, 8, 2, 3, 5]},
-    ],
-    "ミサキ": [
-        {"costume_name": "通常", "bond_bonuses": [5, 8, 11, 14, 4, 5, 9]},
-        {"costume_name": "水着", "bond_bonuses": [3, 5, 6, 8, 2, 3, 5]},
-    ],
-    "ノア": [
-        {"costume_name": "通常", "bond_bonuses": [1, 2, 2, 3, 1, 1, 2]},
-        {"costume_name": "パジャマ", "bond_bonuses": [1, 2, 3, 4, 1, 1, 2]},
-    ],
-    "トキ": [
-        {"costume_name": "通常", "bond_bonuses": [2, 3, 5, 6, 1, 2, 4]},
-        {"costume_name": "バニー", "bond_bonuses": [3, 4, 5, 7, 2, 3, 4]},
-        {"costume_name": "臨戦", "bond_bonuses": [2, 3, 4, 5, 1, 2, 3]},
-    ],
-    "マキ": [
-        {"costume_name": "通常", "bond_bonuses": [2, 3, 5, 6, 1, 2, 4]},
-        {"costume_name": "キャンプ", "bond_bonuses": [3, 5, 6, 8, 2, 3, 5]},
-    ],
-    "サオリ": [
-        {"costume_name": "通常", "bond_bonuses": [2, 3, 4, 5, 1, 2, 3]},
-        {"costume_name": "ドレス", "bond_bonuses": [2, 4, 5, 7, 1, 2, 4]},
-        {"costume_name": "水着", "bond_bonuses": [2, 4, 5, 6, 1, 2, 4]},
-    ],
-    "カヨコ": [
-        {"costume_name": "通常", "bond_bonuses": [1, 2, 2, 3, 1, 1, 2]},
-        {"costume_name": "正月", "bond_bonuses": [1, 2, 3, 3, 1, 1, 2]},
-        {"costume_name": "ドレス", "bond_bonuses": [2, 3, 4, 5, 1, 2, 3]},
-    ],
-    "カズサ": [
-        {"costume_name": "通常", "bond_bonuses": [2, 4, 5, 6, 2, 2, 4]},
-        {"costume_name": "バンド", "bond_bonuses": [3, 4, 5, 7, 2, 2, 4]},
-    ],
-    "ヒビキ": [
-        {"costume_name": "通常", "bond_bonuses": [2, 4, 5, 6, 2, 2, 4]},
-        {"costume_name": "応援団", "bond_bonuses": [7, 10, 13, 16, 4, 6, 11]},
-    ],
-}
+import json
+import sys
+from pathlib import Path
+
+if getattr(sys, "frozen", False):
+    _BASE_DIR = Path(sys._MEIPASS)
+else:
+    _BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+_PRESETS_PATH = _BASE_DIR / "data" / "presets.json"
+
+
+def _load_presets() -> dict[str, list[dict]]:
+    with open(_PRESETS_PATH, encoding="utf-8") as f:
+        return json.load(f)
+
+
+PRESETS: dict[str, list[dict]] = _load_presets()

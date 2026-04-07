@@ -3,7 +3,12 @@
 from dash import html, callback, Input, Output, State, ALL, ctx, no_update
 from dash.exceptions import PreventUpdate
 
-from app.backend.presets import PRESETS
+from app.backend.student import BOND_RANGES
+from app.backend.user_presets import (
+    get_all_presets_for_dropdown,
+    get_preset_data,
+    save_user_preset,
+)
 from app.frontend.layout import (
     make_student_card,
     _make_bond_rank_input,
@@ -163,9 +168,11 @@ def update_students(
         return children, indices, next_idx, rank_children, priority_data, no_update
 
     if trigger == "load-preset-btn":
-        if not preset_name or preset_name not in PRESETS:
+        if not preset_name:
             raise PreventUpdate
-        students = PRESETS[preset_name]
+        students = get_preset_data(preset_name)
+        if not students:
+            raise PreventUpdate
         new_children = []
         new_indices = []
         new_rank_children = []
@@ -188,8 +195,13 @@ def update_students(
             preset_costume_map[i] = s["costume_name"]
         new_order = list(range(len(students)))
         priority_data = _build_priority_data(new_order, preset_costume_map)
+        # ドロップダウン value からキャラ名を抽出
+        display_name = preset_name.split("::", 1)[-1] if "::" in preset_name else preset_name
+        # user:: の場合はキー末尾のタイムスタンプを除去
+        if preset_name.startswith("user::"):
+            display_name = display_name.rsplit("_", 1)[0]
         msg = html.P(
-            f"プリセット「{preset_name}」を読み込みました。",
+            f"プリセット「{display_name}」を読み込みました。",
             style={
                 "color": "#27ae60",
                 "fontWeight": "bold",
@@ -241,3 +253,53 @@ def render_and_reorder_priority(priority_data, up_clicks, down_clicks, up_ids, d
     return _make_priority_cards(priority_data), no_update
 
 
+@callback(
+    Output("submit-feedback", "children"),
+    Output("submit-preset-status", "data"),
+    Output("preset-dropdown", "options"),
+    Input("submit-preset-btn", "n_clicks"),
+    State("submit-character-name", "value"),
+    State("student-indices", "data"),
+    State({"type": "costume", "index": ALL}, "value"),
+    State({"type": "costume", "index": ALL}, "id"),
+    State({"type": "bond", "range_idx": ALL, "index": ALL}, "value"),
+    State({"type": "bond", "range_idx": ALL, "index": ALL}, "id"),
+    prevent_initial_call=True,
+)
+def submit_preset(
+    n_clicks, char_name, indices,
+    costume_values, costume_ids, bond_values, bond_ids,
+):
+    if not char_name or not char_name.strip():
+        return (
+            html.Span("生徒名を入力してください。", style={"color": "red"}),
+            no_update,
+            no_update,
+        )
+
+    # 衣装データを組み立てる
+    idx_order = [cid["index"] for cid in costume_ids]
+    costume_map = {cid["index"]: cv for cv, cid in zip(costume_values, costume_ids)}
+    bond_map = {}
+    for idx in idx_order:
+        bond_map[idx] = [0] * len(BOND_RANGES)
+    for bid, bv in zip(bond_ids, bond_values):
+        bond_map[bid["index"]][bid["range_idx"]] = bv or 0
+
+    costumes = []
+    for idx in idx_order:
+        costumes.append({
+            "costume_name": costume_map.get(idx) or _default_costume_name(idx),
+            "bond_bonuses": bond_map[idx],
+        })
+
+    save_user_preset(char_name.strip(), costumes)
+    options = get_all_presets_for_dropdown()
+    return (
+        html.Span(
+            f"「{char_name.strip()}」を投稿しました。",
+            style={"color": "#27ae60"},
+        ),
+        {"submitted": True},
+        options,
+    )
