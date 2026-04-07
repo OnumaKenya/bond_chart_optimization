@@ -6,7 +6,7 @@ from app.frontend.layout import create_layout
 import app.frontend.callbacks  # noqa: F401 - コールバック登録
 import app.backend.api  # noqa: F401 - API エンドポイント登録
 
-application.layout = create_layout()
+application.layout = create_layout
 
 # ===========================================================================
 # クライアントサイドコールバック

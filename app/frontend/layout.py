@@ -283,7 +283,9 @@ def create_layout() -> html.Div:
                             # プリセット投稿
                             html.Div(
                                 [
-                                    html.Strong("現在の入力データをプリセットとして投稿"),
+                                    html.Strong(
+                                        "現在の入力データをプリセットとして投稿"
+                                    ),
                                     dcc.Input(
                                         id="submit-character-name",
                                         type="text",
@@ -311,7 +313,10 @@ def create_layout() -> html.Div:
                                     ),
                                     html.Div(
                                         id="submit-feedback",
-                                        style={"marginTop": "6px", "fontSize": "0.8rem"},
+                                        style={
+                                            "marginTop": "6px",
+                                            "fontSize": "0.8rem",
+                                        },
                                     ),
                                 ],
                                 className="submit-section",

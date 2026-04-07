@@ -45,6 +45,16 @@ class App(tk.Tk):
         self.geometry("750x500")
         self.configure(padx=12, pady=12)
 
+        # --- 日本語フォント設定 ---
+        jp_font = self._find_jp_font()
+        style = ttk.Style()
+        style.configure("Treeview", font=(jp_font, 10))
+        style.configure("Treeview.Heading", font=(jp_font, 10, "bold"))
+        style.configure("TLabel", font=(jp_font, 10))
+        style.configure("TButton", font=(jp_font, 10))
+        style.configure("TLabelframe.Label", font=(jp_font, 10))
+        self.option_add("*Font", (jp_font, 10))
+
         # --- 上部: 一覧 ---
         list_frame = ttk.LabelFrame(self, text="ユーザー投稿プリセット")
         list_frame.pack(fill=tk.BOTH, expand=True)
@@ -60,7 +70,9 @@ class App(tk.Tk):
         self.tree.column("approved", width=70, anchor=tk.CENTER)
         self.tree.column("submitted", width=170)
 
-        scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.tree.yview)
+        scrollbar = ttk.Scrollbar(
+            list_frame, orient=tk.VERTICAL, command=self.tree.yview
+        )
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -81,14 +93,10 @@ class App(tk.Tk):
         )
         self.promote_btn.pack(side=tk.LEFT, padx=4)
 
-        self.approve_btn = ttk.Button(
-            action_frame, text="承認", command=self._approve
-        )
+        self.approve_btn = ttk.Button(action_frame, text="承認", command=self._approve)
         self.approve_btn.pack(side=tk.LEFT, padx=4)
 
-        self.delete_btn = ttk.Button(
-            action_frame, text="削除", command=self._delete
-        )
+        self.delete_btn = ttk.Button(action_frame, text="削除", command=self._delete)
         self.delete_btn.pack(side=tk.LEFT, padx=4)
 
         ttk.Button(action_frame, text="更新", command=self._refresh).pack(
@@ -98,6 +106,29 @@ class App(tk.Tk):
         self._set_buttons_state(False)
         self._refresh()
 
+    @staticmethod
+    def _find_jp_font() -> str:
+        """利用可能な日本語フォントを探す。"""
+        import tkinter.font as tkfont
+
+        available = tkfont.families()
+        candidates = [
+            "HackGen Console NF",
+            "HackGen35 Console NF",
+            "Noto Sans CJK JP",
+            "Noto Sans JP",
+            "IPAGothic",
+            "IPAPGothic",
+            "TakaoGothic",
+            "Yu Gothic",
+            "MS Gothic",
+            "Meiryo",
+        ]
+        for name in candidates:
+            if name in available:
+                return name
+        return "TkDefaultFont"
+
     def _refresh(self):
         self.user_presets = load_user_presets()
         self.tree.delete(*self.tree.get_children())
@@ -106,7 +137,9 @@ class App(tk.Tk):
             costumes = ", ".join(c["costume_name"] for c in entry["costumes"])
             status = "承認済" if entry.get("approved") else "未承認"
             submitted = entry.get("submitted_at", "")
-            self.tree.insert("", tk.END, iid=key, values=(name, costumes, status, submitted))
+            self.tree.insert(
+                "", tk.END, iid=key, values=(name, costumes, status, submitted)
+            )
         self._set_buttons_state(False)
 
     def _on_select(self, _event):
@@ -139,7 +172,9 @@ class App(tk.Tk):
             return
         presets = load_presets()
         if name in presets:
-            if not messagebox.askyesno("確認", f"「{name}」は既に存在します。上書きしますか？"):
+            if not messagebox.askyesno(
+                "確認", f"「{name}」は既に存在します。上書きしますか？"
+            ):
                 return
         entry = self.user_presets[key]
         presets[name] = entry["costumes"]
