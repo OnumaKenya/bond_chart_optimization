@@ -82,7 +82,9 @@ def push_to_github() -> None:
                 _logger.debug("GitHub sync: no changes to push")
                 return
         elif resp.status_code != 404:
-            _logger.warning("GitHub GET failed: %d %s", resp.status_code, resp.text[:200])
+            _logger.warning(
+                "GitHub GET failed: %d %s", resp.status_code, resp.text[:200]
+            )
             return
     except requests.RequestException as e:
         _logger.warning("GitHub GET error: %s", e)
@@ -90,7 +92,9 @@ def push_to_github() -> None:
 
     # --- ベースブランチの HEAD SHA を取得 ---
     try:
-        resp = requests.get(f"{api}/git/ref/heads/{_BASE_BRANCH}", headers=hdrs, timeout=15)
+        resp = requests.get(
+            f"{api}/git/ref/heads/{_BASE_BRANCH}", headers=hdrs, timeout=15
+        )
         if resp.status_code != 200:
             _logger.warning("GitHub get ref failed: %d", resp.status_code)
             return
@@ -109,7 +113,9 @@ def push_to_github() -> None:
             timeout=15,
         )
         if resp.status_code not in (200, 201):
-            _logger.warning("GitHub create branch failed: %d %s", resp.status_code, resp.text[:200])
+            _logger.warning(
+                "GitHub create branch failed: %d %s", resp.status_code, resp.text[:200]
+            )
             return
     except requests.RequestException as e:
         _logger.warning("GitHub create branch error: %s", e)
@@ -134,9 +140,13 @@ def push_to_github() -> None:
         if file_sha:
             payload["sha"] = file_sha
 
-        resp = requests.put(f"{api}/contents/{_FILE_PATH}", headers=hdrs, json=payload, timeout=15)
+        resp = requests.put(
+            f"{api}/contents/{_FILE_PATH}", headers=hdrs, json=payload, timeout=15
+        )
         if resp.status_code not in (200, 201):
-            _logger.warning("GitHub PUT failed: %d %s", resp.status_code, resp.text[:200])
+            _logger.warning(
+                "GitHub PUT failed: %d %s", resp.status_code, resp.text[:200]
+            )
             return
     except requests.RequestException as e:
         _logger.warning("GitHub PUT error: %s", e)
@@ -162,7 +172,9 @@ def push_to_github() -> None:
             # 既に同内容の PR がある等
             _logger.info("GitHub sync: PR already exists or no diff")
         else:
-            _logger.warning("GitHub PR create failed: %d %s", resp.status_code, resp.text[:200])
+            _logger.warning(
+                "GitHub PR create failed: %d %s", resp.status_code, resp.text[:200]
+            )
     except requests.RequestException as e:
         _logger.warning("GitHub PR create error: %s", e)
 

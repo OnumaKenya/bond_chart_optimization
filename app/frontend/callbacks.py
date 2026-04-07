@@ -196,7 +196,9 @@ def update_students(
         new_order = list(range(len(students)))
         priority_data = _build_priority_data(new_order, preset_costume_map)
         # ドロップダウン value からキャラ名を抽出
-        display_name = preset_name.split("::", 1)[-1] if "::" in preset_name else preset_name
+        display_name = (
+            preset_name.split("::", 1)[-1] if "::" in preset_name else preset_name
+        )
         # user:: の場合はキー末尾のタイムスタンプを除去
         if preset_name.startswith("user::"):
             display_name = display_name.rsplit("_", 1)[0]
@@ -208,7 +210,14 @@ def update_students(
                 "margin": "8px 0",
             },
         )
-        return new_children, new_indices, len(students), new_rank_children, priority_data, msg
+        return (
+            new_children,
+            new_indices,
+            len(students),
+            new_rank_children,
+            priority_data,
+            msg,
+        )
 
     raise PreventUpdate
 
@@ -235,14 +244,20 @@ def sync_bond_rank_labels(costume_values, costume_ids):
     State({"type": "priority-down", "index": ALL}, "id"),
     prevent_initial_call=True,
 )
-def render_and_reorder_priority(priority_data, up_clicks, down_clicks, up_ids, down_ids):
+def render_and_reorder_priority(
+    priority_data, up_clicks, down_clicks, up_ids, down_ids
+):
     trigger = ctx.triggered_id
 
     # 上下ボタンによる並べ替え
     if isinstance(trigger, dict):
         data = list(priority_data)
         move_idx = trigger["index"]
-        pos = next(i for i, e in enumerate(data) if (e["idx"] if isinstance(e, dict) else e) == move_idx)
+        pos = next(
+            i
+            for i, e in enumerate(data)
+            if (e["idx"] if isinstance(e, dict) else e) == move_idx
+        )
         if trigger["type"] == "priority-up" and pos > 0:
             data[pos], data[pos - 1] = data[pos - 1], data[pos]
         elif trigger["type"] == "priority-down" and pos < len(data) - 1:
@@ -267,8 +282,13 @@ def render_and_reorder_priority(priority_data, up_clicks, down_clicks, up_ids, d
     prevent_initial_call=True,
 )
 def submit_preset(
-    n_clicks, char_name, indices,
-    costume_values, costume_ids, bond_values, bond_ids,
+    n_clicks,
+    char_name,
+    indices,
+    costume_values,
+    costume_ids,
+    bond_values,
+    bond_ids,
 ):
     if not char_name or not char_name.strip():
         return (
@@ -288,10 +308,12 @@ def submit_preset(
 
     costumes = []
     for idx in idx_order:
-        costumes.append({
-            "costume_name": costume_map.get(idx) or _default_costume_name(idx),
-            "bond_bonuses": bond_map[idx],
-        })
+        costumes.append(
+            {
+                "costume_name": costume_map.get(idx) or _default_costume_name(idx),
+                "bond_bonuses": bond_map[idx],
+            }
+        )
 
     save_user_preset(char_name.strip(), costumes)
     options = get_all_presets_for_dropdown()

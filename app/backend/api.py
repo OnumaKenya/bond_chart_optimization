@@ -26,11 +26,14 @@ def _require_admin(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         if not _ADMIN_TOKEN:
-            return jsonify({"status": "error", "message": "admin token not configured"}), 503
+            return jsonify(
+                {"status": "error", "message": "admin token not configured"}
+            ), 503
         auth = request.headers.get("Authorization", "")
         if auth != f"Bearer {_ADMIN_TOKEN}":
             return jsonify({"status": "error", "message": "unauthorized"}), 401
         return f(*args, **kwargs)
+
     return wrapper
 
 
@@ -58,7 +61,9 @@ def api_submit_preset():
         return jsonify({"status": "error", "message": "invalid JSON"}), 400
     char_name = data.get("character_name", "").strip()
     if not char_name:
-        return jsonify({"status": "error", "message": "character_name is required"}), 400
+        return jsonify(
+            {"status": "error", "message": "character_name is required"}
+        ), 400
     costumes = data.get("costumes", [])
     err = _validate_costumes(costumes)
     if err:
@@ -85,7 +90,9 @@ def api_admin_action():
         if delete_preset(key):
             return jsonify({"status": "ok"})
         return jsonify({"status": "error", "message": "preset not found"}), 404
-    return jsonify({"status": "error", "message": "action must be 'approve' or 'delete'"}), 400
+    return jsonify(
+        {"status": "error", "message": "action must be 'approve' or 'delete'"}
+    ), 400
 
 
 @server.route("/api/presets/admin/list", methods=["GET"])

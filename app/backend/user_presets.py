@@ -121,11 +121,11 @@ def get_preset_data(dropdown_value: str) -> list[dict] | None:
         {"costume_name": str, "bond_bonuses": list[int]} のリスト。見つからなければ None。
     """
     if dropdown_value.startswith("builtin::"):
-        name = dropdown_value[len("builtin::"):]
+        name = dropdown_value[len("builtin::") :]
         return PRESETS.get(name)
 
     if dropdown_value.startswith("user::"):
-        key = dropdown_value[len("user::"):]
+        key = dropdown_value[len("user::") :]
         user_presets = load_user_presets()
         entry = user_presets.get(key)
         if entry:
