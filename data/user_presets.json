@@ -1,4 +1,35 @@
 {
   "presets": {
+    "ヨシミ_1775598720": {
+      "character_name": "ヨシミ",
+      "costumes": [
+        {
+          "costume_name": "通常",
+          "bond_bonuses": [
+            3,
+            4,
+            5,
+            7,
+            2,
+            3,
+            4
+          ]
+        },
+        {
+          "costume_name": "バンド",
+          "bond_bonuses": [
+            3,
+            4,
+            5,
+            7,
+            2,
+            2,
+            4
+          ]
+        }
+      ],
+      "approved": false,
+      "submitted_at": "2026-04-07T21:52:00Z"
+    }
   }
 }
