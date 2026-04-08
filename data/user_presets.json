@@ -1,4 +1,23 @@
 {
   "presets": {
+    "ハスミ_1775657869": {
+      "character_name": "ハスミ",
+      "costumes": [
+        {
+          "costume_name": "衣装1",
+          "bond_bonuses": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "approved": false,
+      "submitted_at": "2026-04-08T14:17:49Z"
+    }
   }
 }
