@@ -614,6 +614,43 @@ function _solver_calcChartSync(
         totalBonusData.push(bonus);
     }
 
+    // --- 比較手法: 貪欲法 (毎ステップ p/w 最大を選択) ---
+    var greedyExpData = [0];
+    var greedyBonusData = [];
+    var greedyState = currentRanks.slice();
+    var greedyBonus = 0;
+    for (var gri = 0; gri < costumeNames.length; gri++) {
+        greedyBonus += cumPerCostume[gri][greedyState[gri]];
+    }
+    greedyBonusData.push(greedyBonus);
+    var greedyTotal = path.length - 1; // Sidney と同じステップ数
+    for (var gs = 0; gs < greedyTotal; gs++) {
+        var bestCi = -1;
+        var bestP = 0;
+        var bestW = 1;
+        for (var gci = 0; gci < costumeNames.length; gci++) {
+            if (greedyState[gci] >= 50) continue;
+            var gr = greedyState[gci];
+            var gw = _solver_BOND_EXP_PER_LEVEL[gr - 1];
+            var gp = cumPerCostume[gci][gr + 1] - cumPerCostume[gci][gr];
+            // p/w 比較 (整数の交差乗算)
+            if (bestCi === -1 || gp * bestW > bestP * gw) {
+                bestCi = gci;
+                bestP = gp;
+                bestW = gw;
+            }
+        }
+        if (bestCi === -1) break;
+        var grw = _solver_BOND_EXP_PER_LEVEL[greedyState[bestCi] - 1];
+        greedyExpData.push(greedyExpData[greedyExpData.length - 1] + grw);
+        greedyState[bestCi]++;
+        var grb = 0;
+        for (var gbci = 0; gbci < costumeNames.length; gbci++) {
+            grb += cumPerCostume[gbci][greedyState[gbci]];
+        }
+        greedyBonusData.push(grb);
+    }
+
     // 要約チャートの各行に対応する縦線
     var vlineShapes = [];
     var vlineAnnotations = [];
@@ -641,29 +678,31 @@ function _solver_calcChartSync(
     var graphFigure = {
         data: [
             {
+                name: "Sidney分解（最適）",
                 x: cumExpData,
                 y: totalBonusData,
                 type: "scatter",
-                mode: "lines+markers",
-                marker: { size: 4, color: "#2ecc71" },
-                line: { color: "#2ecc71", width: 2 },
+                mode: "lines",
+                line: { color: "#2ecc71", width: 2.5, shape: "hv" },
                 fill: "tozeroy",
-                fillcolor: "rgba(46,204,113,0.15)",
-                fillgradient: {
-                    type: "vertical",
-                    colorscale: [
-                        [0, "rgba(46,204,113,0)"],
-                        [1, "rgba(46,204,113,0.3)"],
-                    ],
-                },
+                fillcolor: "rgba(46,204,113,0.1)",
+            },
+            {
+                name: "貪欲法",
+                x: greedyExpData,
+                y: greedyBonusData,
+                type: "scatter",
+                mode: "lines",
+                line: { color: "#e67e22", width: 1.5, shape: "hv" },
             },
         ],
         layout: {
             title: { text: "経験値 vs 絆ボーナス合計値" },
             xaxis: { title: { text: "累積経験値" } },
-            yaxis: { title: { text: "絆ボーナス合計値" } },
+            yaxis: { title: { text: "絆ボーナス合計値" }, range: [initBonus, totalBonusData[totalBonusData.length - 1]] },
+            legend: { x: 0.02, y: 0.98, bgcolor: "rgba(255,255,255,0.8)" },
             margin: { t: 40, r: 20, b: 50, l: 60 },
-            height: 350,
+            height: 380,
             shapes: vlineShapes,
             annotations: vlineAnnotations,
         },
