@@ -1,4 +1,66 @@
 {
   "presets": {
+    "イズナ_1775740310": {
+      "character_name": "イズナ",
+      "costumes": [
+        {
+          "costume_name": "通常",
+          "bond_bonuses": [
+            2,
+            3,
+            4,
+            5,
+            1,
+            2,
+            3
+          ]
+        },
+        {
+          "costume_name": "水着",
+          "bond_bonuses": [
+            2,
+            3,
+            4,
+            5,
+            1,
+            2,
+            3
+          ]
+        }
+      ],
+      "approved": false,
+      "submitted_at": "2026-04-09T13:11:50Z"
+    },
+    "ヒナタ_1775740542": {
+      "character_name": "ヒナタ",
+      "costumes": [
+        {
+          "costume_name": "通常",
+          "bond_bonuses": [
+            2,
+            3,
+            3,
+            4,
+            1,
+            2,
+            3
+          ]
+        },
+        {
+          "costume_name": "水着",
+          "bond_bonuses": [
+            3,
+            5,
+            6,
+            8,
+            2,
+            3,
+            5
+          ]
+        }
+      ],
+      "approved": false,
+      "submitted_at": "2026-04-09T13:15:42Z"
+    }
   }
 }
