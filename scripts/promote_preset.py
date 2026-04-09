@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
-"""ユーザー投稿プリセットを公式プリセットに昇格させる GUI ツール。
+"""ユーザー投稿プリセットを公式プリセットに昇格させるローカル管理ツール。
 
 使い方:
     python scripts/promote_preset.py
+
+実行するとローカル HTTP サーバーが起動し、自動でブラウザが開きます。
 """
 
 import json
-import tkinter as tk
-from tkinter import ttk, messagebox
+import threading
+import webbrowser
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 _BASE_DIR = Path(__file__).resolve().parent.parent
 _PRESETS_PATH = _BASE_DIR / "data" / "presets.json"
@@ -38,171 +42,189 @@ def save_user_presets(presets: dict) -> None:
         json.dump({"presets": presets}, f, ensure_ascii=False, indent=2)
 
 
-class App(tk.Tk):
-    def __init__(self):
-        super().__init__()
-        self.title("プリセット管理")
-        self.geometry("750x500")
-        self.configure(padx=12, pady=12)
+def html_escape(s: str) -> str:
+    return (
+        s.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&#39;")
+    )
 
-        # --- 日本語フォント設定 ---
-        jp_font = self._find_jp_font()
-        style = ttk.Style()
-        style.configure("Treeview", font=(jp_font, 10))
-        style.configure("Treeview.Heading", font=(jp_font, 10, "bold"))
-        style.configure("TLabel", font=(jp_font, 10))
-        style.configure("TButton", font=(jp_font, 10))
-        style.configure("TLabelframe.Label", font=(jp_font, 10))
-        self.option_add("*Font", (jp_font, 10))
 
-        # --- 上部: 一覧 ---
-        list_frame = ttk.LabelFrame(self, text="ユーザー投稿プリセット")
-        list_frame.pack(fill=tk.BOTH, expand=True)
+_STYLE = """
+<style>
+  body { font-family: sans-serif; max-width: 1000px; margin: 30px auto; padding: 0 20px;
+         background: #f5f5f5; }
+  h1 { color: #333; }
+  .msg { padding: 10px; border-radius: 6px; margin: 12px 0; }
+  .msg-ok { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+  table { border-collapse: collapse; width: 100%; background: white;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 0.9rem;
+           vertical-align: top; }
+  th { background: #2ecc71; color: white; }
+  tr:nth-child(even) { background: #f9f9f9; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 12px;
+           font-size: 0.75rem; }
+  .badge-pending { background: #fff3cd; color: #856404; }
+  .badge-approved { background: #d4edda; color: #155724; }
+  button { cursor: pointer; border: none; padding: 6px 14px; border-radius: 4px;
+           font-size: 0.85rem; color: white; }
+  .btn-approve { background: #27ae60; }
+  .btn-promote { background: #2980b9; }
+  .btn-delete { background: #e74c3c; }
+  input[type=text] { padding: 6px; border: 1px solid #ccc; border-radius: 4px;
+                     font-size: 0.85rem; width: 110px; }
+  .actions { display: flex; flex-direction: column; gap: 6px; }
+  .action-row { display: flex; gap: 4px; align-items: center; }
+  .costume-list { font-size: 0.78rem; color: #555; line-height: 1.5; }
+  form { margin: 0; }
+  .empty { text-align: center; color: #888; padding: 30px; }
+  .footer { text-align: center; color: #999; font-size: 0.8rem; margin-top: 30px; }
+</style>
+"""
 
-        cols = ("name", "costumes", "approved", "submitted")
-        self.tree = ttk.Treeview(list_frame, columns=cols, show="headings", height=10)
-        self.tree.heading("name", text="生徒名")
-        self.tree.heading("costumes", text="衣装")
-        self.tree.heading("approved", text="状態")
-        self.tree.heading("submitted", text="投稿日時")
-        self.tree.column("name", width=100)
-        self.tree.column("costumes", width=280)
-        self.tree.column("approved", width=70, anchor=tk.CENTER)
-        self.tree.column("submitted", width=170)
 
-        scrollbar = ttk.Scrollbar(
-            list_frame, orient=tk.VERTICAL, command=self.tree.yview
-        )
-        self.tree.configure(yscrollcommand=scrollbar.set)
-        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+def render_page(message: str = "") -> str:
+    user_presets = load_user_presets()
+    msg_html = (
+        f'<div class="msg msg-ok">{html_escape(message)}</div>' if message else ""
+    )
 
-        self.tree.bind("<<TreeviewSelect>>", self._on_select)
-
-        # --- 下部: 操作 ---
-        action_frame = ttk.Frame(self)
-        action_frame.pack(fill=tk.X, pady=(12, 0))
-
-        ttk.Label(action_frame, text="登録名:").pack(side=tk.LEFT)
-        self.name_var = tk.StringVar()
-        self.name_entry = ttk.Entry(action_frame, textvariable=self.name_var, width=20)
-        self.name_entry.pack(side=tk.LEFT, padx=(4, 12))
-
-        self.promote_btn = ttk.Button(
-            action_frame, text="公式に昇格", command=self._promote
-        )
-        self.promote_btn.pack(side=tk.LEFT, padx=4)
-
-        self.approve_btn = ttk.Button(action_frame, text="承認", command=self._approve)
-        self.approve_btn.pack(side=tk.LEFT, padx=4)
-
-        self.delete_btn = ttk.Button(action_frame, text="削除", command=self._delete)
-        self.delete_btn.pack(side=tk.LEFT, padx=4)
-
-        ttk.Button(action_frame, text="更新", command=self._refresh).pack(
-            side=tk.RIGHT, padx=4
-        )
-
-        self._set_buttons_state(False)
-        self._refresh()
-
-    @staticmethod
-    def _find_jp_font() -> str:
-        """利用可能な日本語フォントを探す。"""
-        import tkinter.font as tkfont
-
-        available = tkfont.families()
-        candidates = [
-            "HackGen Console NF",
-            "HackGen35 Console NF",
-            "Noto Sans CJK JP",
-            "Noto Sans JP",
-            "IPAGothic",
-            "IPAPGothic",
-            "TakaoGothic",
-            "Yu Gothic",
-            "MS Gothic",
-            "Meiryo",
-        ]
-        for name in candidates:
-            if name in available:
-                return name
-        return "TkDefaultFont"
-
-    def _refresh(self):
-        self.user_presets = load_user_presets()
-        self.tree.delete(*self.tree.get_children())
-        for key, entry in self.user_presets.items():
-            name = entry["character_name"]
-            costumes = ", ".join(c["costume_name"] for c in entry["costumes"])
-            status = "承認済" if entry.get("approved") else "未承認"
-            submitted = entry.get("submitted_at", "")
-            self.tree.insert(
-                "", tk.END, iid=key, values=(name, costumes, status, submitted)
+    if not user_presets:
+        body = '<div class="empty">ユーザー投稿プリセットはありません。</div>'
+    else:
+        rows = ""
+        for key, entry in user_presets.items():
+            name = html_escape(entry["character_name"])
+            costumes_html = "<br>".join(
+                f"・{html_escape(c['costume_name'])}: {c['bond_bonuses']}"
+                for c in entry["costumes"]
             )
-        self._set_buttons_state(False)
+            status = (
+                '<span class="badge badge-approved">承認済</span>'
+                if entry.get("approved")
+                else '<span class="badge badge-pending">未承認</span>'
+            )
+            submitted = html_escape(entry.get("submitted_at", ""))
+            ekey = html_escape(key)
 
-    def _on_select(self, _event):
-        sel = self.tree.selection()
-        if sel:
-            key = sel[0]
-            entry = self.user_presets.get(key, {})
-            self.name_var.set(entry.get("character_name", ""))
-            self._set_buttons_state(True)
+            rows += f"""<tr>
+              <td><strong>{name}</strong><br><div class="costume-list">{costumes_html}</div></td>
+              <td>{status}<br><small>{submitted}</small></td>
+              <td><div class="actions">
+                <form method="post" action="/action" class="action-row">
+                  <input type="hidden" name="key" value="{ekey}">
+                  <input type="hidden" name="action" value="promote">
+                  <input type="text" name="name" value="{name}">
+                  <button type="submit" class="btn-promote">公式に昇格</button>
+                </form>
+                <div class="action-row">
+                  <form method="post" action="/action">
+                    <input type="hidden" name="key" value="{ekey}">
+                    <input type="hidden" name="action" value="approve">
+                    <button type="submit" class="btn-approve">承認</button>
+                  </form>
+                  <form method="post" action="/action"
+                    onsubmit="return confirm('「{name}」を削除しますか？')">
+                    <input type="hidden" name="key" value="{ekey}">
+                    <input type="hidden" name="action" value="delete">
+                    <button type="submit" class="btn-delete">削除</button>
+                  </form>
+                </div>
+              </div></td>
+            </tr>"""
+        body = f"""<table><thead><tr>
+          <th style="width:50%">生徒 / 衣装</th><th>状態</th><th>操作</th>
+        </tr></thead><tbody>{rows}</tbody></table>"""
+
+    return f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+    <title>プリセット管理</title>{_STYLE}</head><body>
+    <h1>プリセット管理</h1>
+    {msg_html}
+    {body}
+    <div class="footer">このウィンドウを閉じてサーバーを停止してください</div>
+    </body></html>"""
+
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *_args, **_kwargs):
+        pass  # ログを抑制
+
+    def _send_html(self, html: str, status: int = 200):
+        body = html.encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _redirect(self, location: str):
+        self.send_response(303)
+        self.send_header("Location", location)
+        self.end_headers()
+
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        if parsed.path == "/":
+            msg = parse_qs(parsed.query).get("msg", [""])[0]
+            self._send_html(render_page(msg))
         else:
-            self._set_buttons_state(False)
+            self._send_html("Not Found", 404)
 
-    def _set_buttons_state(self, enabled: bool):
-        state = "normal" if enabled else "disabled"
-        self.promote_btn.configure(state=state)
-        self.approve_btn.configure(state=state)
-        self.delete_btn.configure(state=state)
+    def do_POST(self):
+        if self.path != "/action":
+            self._send_html("Not Found", 404)
+            return
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length).decode("utf-8")
+        params = parse_qs(body)
+        action = params.get("action", [""])[0]
+        key = params.get("key", [""])[0]
+        name = params.get("name", [""])[0].strip()
 
-    def _selected_key(self) -> str | None:
-        sel = self.tree.selection()
-        return sel[0] if sel else None
+        user_presets = load_user_presets()
+        msg = ""
 
-    def _promote(self):
-        key = self._selected_key()
-        if not key:
-            return
-        name = self.name_var.get().strip()
-        if not name:
-            messagebox.showwarning("エラー", "登録名を入力してください。")
-            return
-        presets = load_presets()
-        if name in presets:
-            if not messagebox.askyesno(
-                "確認", f"「{name}」は既に存在します。上書きしますか？"
-            ):
-                return
-        entry = self.user_presets[key]
-        presets[name] = entry["costumes"]
-        save_presets(presets)
-        del self.user_presets[key]
-        save_user_presets(self.user_presets)
-        messagebox.showinfo("完了", f"「{name}」を公式プリセットに登録しました。")
-        self._refresh()
+        if key not in user_presets:
+            msg = "プリセットが見つかりません"
+        elif action == "approve":
+            user_presets[key]["approved"] = True
+            save_user_presets(user_presets)
+            msg = f"「{user_presets[key]['character_name']}」を承認しました"
+        elif action == "delete":
+            del_name = user_presets[key]["character_name"]
+            del user_presets[key]
+            save_user_presets(user_presets)
+            msg = f"「{del_name}」を削除しました"
+        elif action == "promote":
+            register_name = name or user_presets[key]["character_name"]
+            presets = load_presets()
+            presets[register_name] = user_presets[key]["costumes"]
+            save_presets(presets)
+            del user_presets[key]
+            save_user_presets(user_presets)
+            msg = f"「{register_name}」を公式プリセットに昇格しました"
 
-    def _approve(self):
-        key = self._selected_key()
-        if not key:
-            return
-        self.user_presets[key]["approved"] = True
-        save_user_presets(self.user_presets)
-        self._refresh()
+        from urllib.parse import quote
 
-    def _delete(self):
-        key = self._selected_key()
-        if not key:
-            return
-        name = self.user_presets[key]["character_name"]
-        if not messagebox.askyesno("確認", f"「{name}」を削除しますか？"):
-            return
-        del self.user_presets[key]
-        save_user_presets(self.user_presets)
-        self._refresh()
+        self._redirect(f"/?msg={quote(msg)}")
+
+
+def main():
+    port = 18765
+    server = HTTPServer(("127.0.0.1", port), Handler)
+    url = f"http://127.0.0.1:{port}/"
+    print(f"プリセット管理サーバーを起動しました: {url}")
+    print("Ctrl+C で停止します")
+    threading.Timer(0.5, lambda: webbrowser.open(url)).start()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\n停止しました")
+        server.server_close()
 
 
 if __name__ == "__main__":
-    App().mainloop()
+    main()
