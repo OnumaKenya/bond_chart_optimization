@@ -1,4 +1,66 @@
 {
   "presets": {
+    "ハスミ_1775657869": {
+      "character_name": "ハスミ",
+      "costumes": [
+        {
+          "costume_name": "衣装1",
+          "bond_bonuses": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "approved": false,
+      "submitted_at": "2026-04-08T14:17:49Z"
+    },
+    "アル_1775660328": {
+      "character_name": "アル",
+      "costumes": [
+        {
+          "costume_name": "アル",
+          "bond_bonuses": [
+            4,
+            6,
+            0,
+            0,
+            0,
+            4,
+            0
+          ]
+        },
+        {
+          "costume_name": "アル（正月）",
+          "bond_bonuses": [
+            3,
+            5,
+            6,
+            8,
+            2,
+            3,
+            5
+          ]
+        },
+        {
+          "costume_name": "アル（ドレス）",
+          "bond_bonuses": [
+            3,
+            4,
+            6,
+            7,
+            2,
+            3,
+            4
+          ]
+        }
+      ],
+      "approved": false,
+      "submitted_at": "2026-04-08T14:58:48Z"
+    }
   }
 }
