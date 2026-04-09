@@ -1,12 +1,24 @@
 import os
 
 from dash import ALL, ClientsideFunction, Input, Output, State
+from flask import request
 from app import app as application
 from app.frontend.layout import create_layout
 import app.frontend.callbacks  # noqa: F401 - コールバック登録
 import app.backend.api  # noqa: F401 - API エンドポイント登録
 
 application.layout = create_layout
+
+
+# Dash 内部エンドポイント (/_dash-layout 等) のキャッシュを無効化
+# CDN/ブラウザが古いレイアウトを返すのを防ぐ
+@application.server.after_request
+def _no_cache_dash_endpoints(response):
+    if "/_dash-" in (request.path or ""):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 
 # ===========================================================================
 # クライアントサイドコールバック

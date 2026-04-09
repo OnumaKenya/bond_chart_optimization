@@ -562,5 +562,81 @@
         4
       ]
     }
+  ],
+  "アル": [
+    {
+      "costume_name": "通常",
+      "bond_bonuses": [
+        4,
+        6,
+        7,
+        9,
+        2,
+        4,
+        6
+      ]
+    },
+    {
+      "costume_name": "正月",
+      "bond_bonuses": [
+        3,
+        5,
+        6,
+        8,
+        2,
+        3,
+        5
+      ]
+    },
+    {
+      "costume_name": "ドレス",
+      "bond_bonuses": [
+        3,
+        4,
+        6,
+        7,
+        2,
+        3,
+        4
+      ]
+    }
+  ],
+  "ハスミ": [
+    {
+      "costume_name": "通常",
+      "bond_bonuses": [
+        3,
+        5,
+        7,
+        9,
+        2,
+        3,
+        6
+      ]
+    },
+    {
+      "costume_name": "体操服",
+      "bond_bonuses": [
+        3,
+        5,
+        6,
+        8,
+        2,
+        3,
+        5
+      ]
+    },
+    {
+      "costume_name": "水着",
+      "bond_bonuses": [
+        4,
+        5,
+        7,
+        9,
+        2,
+        3,
+        5
+      ]
+    }
   ]
 }
