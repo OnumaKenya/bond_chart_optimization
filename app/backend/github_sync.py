@@ -1,7 +1,9 @@
 """GitHub リポジトリへの user_presets.json 同期。
 
 書き込みのたびに schedule_sync() を呼び出し、
-デバウンス後に GitHub API でブランチを作成し PR を出す。
+デバウンス後に GitHub API でブランチを更新し PR を確認する。
+
+固定ブランチ名 + 既存 PR 検索により、複数 PR が作成されるのを防ぐ。
 """
 
 import atexit
@@ -10,16 +12,17 @@ import json
 import logging
 import os
 import threading
-import time
 
 _logger = logging.getLogger(__name__)
 
 _DEBOUNCE_SECONDS = 30
 _FILE_PATH = "data/user_presets.json"
 _BASE_BRANCH = "master"
+_SYNC_BRANCH = "sync/user-presets"
 
 _timer: threading.Timer | None = None
 _timer_lock = threading.Lock()
+_push_lock = threading.Lock()  # push_to_github の同時実行を防ぐ
 
 
 def _get_config() -> tuple[str, str] | None:
@@ -49,7 +52,17 @@ def _headers(token: str) -> dict:
 
 
 def push_to_github() -> None:
-    """user_presets.json の変更をブランチに push し PR を作成する。"""
+    """user_presets.json を sync ブランチに push し、PR がなければ作成する。"""
+    if not _push_lock.acquire(blocking=False):
+        _logger.debug("GitHub sync: already running, skip")
+        return
+    try:
+        _push_to_github_inner()
+    finally:
+        _push_lock.release()
+
+
+def _push_to_github_inner() -> None:
     config = _get_config()
     if not config:
         _logger.debug("GitHub sync skipped: GITHUB_TOKEN or GITHUB_REPO not set")
@@ -67,7 +80,7 @@ def push_to_github() -> None:
         _logger.debug("GitHub sync: no presets to push")
         return
 
-    # --- ベースブランチの現在のファイルと比較 ---
+    # --- master のファイルと比較 ---
     try:
         resp = requests.get(
             f"{api}/contents/{_FILE_PATH}",
@@ -83,51 +96,74 @@ def push_to_github() -> None:
                 return
         elif resp.status_code != 404:
             _logger.warning(
-                "GitHub GET failed: %d %s", resp.status_code, resp.text[:200]
+                "GitHub GET (master) failed: %d %s", resp.status_code, resp.text[:200]
             )
             return
     except requests.RequestException as e:
-        _logger.warning("GitHub GET error: %s", e)
+        _logger.warning("GitHub GET (master) error: %s", e)
         return
 
-    # --- ベースブランチの HEAD SHA を取得 ---
+    # --- master HEAD SHA を取得 ---
     try:
         resp = requests.get(
             f"{api}/git/ref/heads/{_BASE_BRANCH}", headers=hdrs, timeout=15
         )
         if resp.status_code != 200:
-            _logger.warning("GitHub get ref failed: %d", resp.status_code)
+            _logger.warning("GitHub get base ref failed: %d", resp.status_code)
             return
         base_sha = resp.json()["object"]["sha"]
     except requests.RequestException as e:
-        _logger.warning("GitHub get ref error: %s", e)
+        _logger.warning("GitHub get base ref error: %s", e)
         return
 
-    # --- ブランチ作成 ---
-    branch_name = f"sync/user-presets-{int(time.time())}"
+    # --- sync ブランチを master HEAD にリセット (force) ---
+    sync_ref = f"heads/{_SYNC_BRANCH}"
     try:
-        resp = requests.post(
-            f"{api}/git/refs",
-            headers=hdrs,
-            json={"ref": f"refs/heads/{branch_name}", "sha": base_sha},
-            timeout=15,
-        )
-        if resp.status_code not in (200, 201):
-            _logger.warning(
-                "GitHub create branch failed: %d %s", resp.status_code, resp.text[:200]
+        resp = requests.get(f"{api}/git/ref/{sync_ref}", headers=hdrs, timeout=15)
+        if resp.status_code == 200:
+            # ブランチ存在 → master HEAD に force update
+            resp = requests.patch(
+                f"{api}/git/refs/{sync_ref}",
+                headers=hdrs,
+                json={"sha": base_sha, "force": True},
+                timeout=15,
             )
+            if resp.status_code != 200:
+                _logger.warning(
+                    "GitHub force-update branch failed: %d %s",
+                    resp.status_code,
+                    resp.text[:200],
+                )
+                return
+        elif resp.status_code == 404:
+            # ブランチ未作成 → 新規作成
+            resp = requests.post(
+                f"{api}/git/refs",
+                headers=hdrs,
+                json={"ref": f"refs/{sync_ref}", "sha": base_sha},
+                timeout=15,
+            )
+            if resp.status_code not in (200, 201):
+                _logger.warning(
+                    "GitHub create branch failed: %d %s",
+                    resp.status_code,
+                    resp.text[:200],
+                )
+                return
+        else:
+            _logger.warning("GitHub get branch ref failed: %d", resp.status_code)
             return
     except requests.RequestException as e:
-        _logger.warning("GitHub create branch error: %s", e)
+        _logger.warning("GitHub branch update error: %s", e)
         return
 
-    # --- ファイルを更新 (ブランチ上) ---
+    # --- ファイルを sync ブランチに commit ---
     try:
-        # ブランチ上の現在のファイル SHA を取得
+        # ブランチ上の現在のファイル SHA を取得 (master と同じはず)
         resp = requests.get(
             f"{api}/contents/{_FILE_PATH}",
             headers=hdrs,
-            params={"ref": branch_name},
+            params={"ref": _SYNC_BRANCH},
             timeout=15,
         )
         file_sha = resp.json().get("sha") if resp.status_code == 200 else None
@@ -135,7 +171,7 @@ def push_to_github() -> None:
         payload = {
             "message": "sync user_presets.json",
             "content": base64.b64encode(local_bytes).decode(),
-            "branch": branch_name,
+            "branch": _SYNC_BRANCH,
         }
         if file_sha:
             payload["sha"] = file_sha
@@ -152,6 +188,31 @@ def push_to_github() -> None:
         _logger.warning("GitHub PUT error: %s", e)
         return
 
+    # --- 既存 PR を検索 ---
+    owner = repo.split("/")[0]
+    try:
+        resp = requests.get(
+            f"{api}/pulls",
+            headers=hdrs,
+            params={
+                "state": "open",
+                "head": f"{owner}:{_SYNC_BRANCH}",
+                "base": _BASE_BRANCH,
+            },
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            existing_prs = resp.json()
+            if existing_prs:
+                _logger.info(
+                    "GitHub sync: existing PR updated %s",
+                    existing_prs[0].get("html_url", ""),
+                )
+                return
+    except requests.RequestException as e:
+        _logger.warning("GitHub list PRs error: %s", e)
+        # PR 検索失敗時は作成を試みる (重複は 422 で防がれる)
+
     # --- PR 作成 ---
     try:
         resp = requests.post(
@@ -160,7 +221,7 @@ def push_to_github() -> None:
             json={
                 "title": "sync: ユーザー投稿プリセットを同期",
                 "body": "Render 上のユーザー投稿プリセットを自動同期します。",
-                "head": branch_name,
+                "head": _SYNC_BRANCH,
                 "base": _BASE_BRANCH,
             },
             timeout=15,
@@ -169,7 +230,6 @@ def push_to_github() -> None:
             pr_url = resp.json().get("html_url", "")
             _logger.info("GitHub sync: PR created %s", pr_url)
         elif resp.status_code == 422:
-            # 既に同内容の PR がある等
             _logger.info("GitHub sync: PR already exists or no diff")
         else:
             _logger.warning(
@@ -191,13 +251,16 @@ def schedule_sync() -> None:
 
 
 def _flush_on_exit() -> None:
-    """終了時に未 push のデータを同期する。"""
+    """終了時に保留中のタイマーがあれば即座に同期する。"""
     global _timer
+    pending = False
     with _timer_lock:
         if _timer is not None and _timer.is_alive():
             _timer.cancel()
             _timer = None
-    push_to_github()
+            pending = True
+    if pending:
+        push_to_github()
 
 
 atexit.register(_flush_on_exit)
