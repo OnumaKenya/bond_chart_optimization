@@ -94,11 +94,28 @@ def promote_preset(key: str, name: str | None = None) -> bool:
     return True
 
 
+def _kata_to_hira(text: str) -> str:
+    """カタカナをひらがなに変換する。"""
+    return "".join(
+        chr(ord(c) - 0x60) if "\u30A1" <= c <= "\u30F6" else c for c in text
+    )
+
+
+def _search_text(name: str) -> str:
+    """検索用テキスト（カタカナ + ひらがな）を生成する。"""
+    hira = _kata_to_hira(name)
+    return f"{name} {hira}" if hira != name else name
+
+
 def get_all_presets_for_dropdown() -> list[dict]:
     """ビルトイン + ユーザー投稿プリセットをドロップダウン用に返す。"""
     options = []
     for name in PRESETS:
-        options.append({"label": name, "value": f"builtin::{name}"})
+        options.append({
+            "label": name,
+            "value": f"builtin::{name}",
+            "search": _search_text(name),
+        })
 
     user_presets = load_user_presets()
     for key, entry in user_presets.items():
@@ -107,7 +124,11 @@ def get_all_presets_for_dropdown() -> list[dict]:
             label = char_name
         else:
             label = f"{char_name} [ユーザー投稿]"
-        options.append({"label": label, "value": f"user::{key}"})
+        options.append({
+            "label": label,
+            "value": f"user::{key}",
+            "search": _search_text(char_name),
+        })
 
     return options
 
