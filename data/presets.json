@@ -690,5 +690,251 @@
         5
       ]
     }
+  ],
+  "アコ": [
+    {
+      "costume_name": "通常",
+      "bond_bonuses": [
+        1,
+        2,
+        3,
+        4,
+        1,
+        1,
+        2
+      ]
+    },
+    {
+      "costume_name": "ドレス",
+      "bond_bonuses": [
+        1,
+        2,
+        3,
+        4,
+        1,
+        1,
+        2
+      ]
+    }
+  ],
+  "フブキ": [
+    {
+      "costume_name": "通常",
+      "bond_bonuses": [
+        2,
+        4,
+        5,
+        6,
+        2,
+        2,
+        4
+      ]
+    },
+    {
+      "costume_name": "水着",
+      "bond_bonuses": [
+        3,
+        5,
+        6,
+        8,
+        2,
+        3,
+        5
+      ]
+    }
+  ],
+  "フィーナ": [
+    {
+      "costume_name": "通常",
+      "bond_bonuses": [
+        3,
+        4,
+        5,
+        6,
+        2,
+        2,
+        4
+      ]
+    },
+    {
+      "costume_name": "ガイド",
+      "bond_bonuses": [
+        3,
+        4,
+        6,
+        8,
+        1,
+        3,
+        5
+      ]
+    }
+  ],
+  "ユズ": [
+    {
+      "costume_name": "通常",
+      "bond_bonuses": [
+        4,
+        5,
+        7,
+        9,
+        2,
+        3,
+        6
+      ]
+    },
+    {
+      "costume_name": "メイド",
+      "bond_bonuses": [
+        3,
+        5,
+        7,
+        8,
+        2,
+        3,
+        5
+      ]
+    },
+    {
+      "costume_name": "臨戦",
+      "bond_bonuses": [
+        3,
+        4,
+        5,
+        6,
+        2,
+        2,
+        4
+      ]
+    }
+  ],
+  "ヒヨリ": [
+    {
+      "costume_name": "通常",
+      "bond_bonuses": [
+        2,
+        3,
+        4,
+        5,
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "costume_name": "水着",
+      "bond_bonuses": [
+        4,
+        6,
+        8,
+        10,
+        2,
+        4,
+        6
+      ]
+    }
+  ],
+  "ノノミ": [
+    {
+      "costume_name": "通常",
+      "bond_bonuses": [
+        3,
+        4,
+        5,
+        7,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "costume_name": "水着",
+      "bond_bonuses": [
+        3,
+        4,
+        5,
+        7,
+        2,
+        3,
+        4
+      ]
+    }
+  ],
+  "キキョウ": [
+    {
+      "costume_name": "通常",
+      "bond_bonuses": [
+        2,
+        4,
+        5,
+        6,
+        1,
+        2,
+        4
+      ]
+    },
+    {
+      "costume_name": "水着",
+      "bond_bonuses": [
+        0,
+        0,
+        6,
+        7,
+        1,
+        2,
+        3
+      ]
+    }
+  ],
+  "ユカリ": [
+    {
+      "costume_name": "通常",
+      "bond_bonuses": [
+        3,
+        5,
+        7,
+        8,
+        2,
+        3,
+        5
+      ]
+    },
+    {
+      "costume_name": "水着",
+      "bond_bonuses": [
+        3,
+        4,
+        5,
+        6,
+        1,
+        2,
+        4
+      ]
+    }
+  ],
+  "マリナ": [
+    {
+      "costume_name": "通常",
+      "bond_bonuses": [
+        0,
+        0,
+        3,
+        4,
+        1,
+        1,
+        2
+      ]
+    },
+    {
+      "costume_name": "チーパオ",
+      "bond_bonuses": [
+        3,
+        4,
+        5,
+        7,
+        2,
+        2,
+        4
+      ]
+    }
   ]
 }
