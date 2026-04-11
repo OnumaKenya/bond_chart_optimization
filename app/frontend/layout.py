@@ -284,42 +284,62 @@ def create_layout() -> html.Div:
                                 },
                             ),
                             # プリセット投稿
-                            html.Div(
+                            html.Details(
                                 [
-                                    html.Strong(
-                                        "現在の入力データをプリセットとして投稿"
-                                    ),
-                                    dcc.Input(
-                                        id="submit-character-name",
-                                        type="text",
-                                        placeholder="生徒名を入力...",
+                                    html.Summary(
+                                        "プリセット投稿",
                                         style={
-                                            "width": "100%",
-                                            "marginTop": "6px",
-                                            "fontSize": "0.85rem",
-                                        },
-                                    ),
-                                    html.Button(
-                                        "投稿",
-                                        id="submit-preset-btn",
-                                        n_clicks=0,
-                                        style={
-                                            "marginTop": "8px",
-                                            "width": "100%",
-                                            "background": "#e67e22",
-                                            "color": "white",
-                                            "border": "none",
-                                            "borderRadius": "4px",
-                                            "padding": "6px 16px",
                                             "cursor": "pointer",
+                                            "fontWeight": "bold",
                                         },
                                     ),
                                     html.Div(
-                                        id="submit-feedback",
-                                        style={
-                                            "marginTop": "6px",
-                                            "fontSize": "0.8rem",
-                                        },
+                                        [
+                                            html.P(
+                                                "現在の絆ボーナスの入力内容を、全ユーザーが利用できるプリセットとして共有します。"
+                                                "保存機能ではありません。",
+                                                style={
+                                                    "fontSize": "0.8rem",
+                                                    "color": "#666",
+                                                    "margin": "0 0 8px 0",
+                                                },
+                                            ),
+                                            dcc.Input(
+                                                id="submit-character-name",
+                                                type="text",
+                                                placeholder="生徒名を入力...",
+                                                style={
+                                                    "width": "100%",
+                                                    "marginTop": "6px",
+                                                    "fontSize": "0.85rem",
+                                                },
+                                            ),
+                                            dcc.ConfirmDialogProvider(
+                                                html.Button(
+                                                    "投稿",
+                                                    style={
+                                                        "marginTop": "8px",
+                                                        "width": "100%",
+                                                        "background": "#e67e22",
+                                                        "color": "white",
+                                                        "border": "none",
+                                                        "borderRadius": "4px",
+                                                        "padding": "6px 16px",
+                                                        "cursor": "pointer",
+                                                    },
+                                                ),
+                                                id="submit-preset-btn",
+                                                message="プリセットを投稿しますか？",
+                                            ),
+                                            html.Div(
+                                                id="submit-feedback",
+                                                style={
+                                                    "marginTop": "6px",
+                                                    "fontSize": "0.8rem",
+                                                },
+                                            ),
+                                        ],
+                                        style={"marginTop": "8px"},
                                     ),
                                 ],
                                 className="submit-section",

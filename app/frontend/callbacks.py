@@ -266,7 +266,7 @@ def render_and_reorder_priority(
     Output("submit-feedback", "children"),
     Output("submit-preset-status", "data"),
     Output("preset-dropdown", "options"),
-    Input("submit-preset-btn", "n_clicks"),
+    Input("submit-preset-btn", "submit_n_clicks"),
     State("submit-character-name", "value"),
     State("student-indices", "data"),
     State({"type": "costume", "index": ALL}, "value"),
