@@ -123,7 +123,7 @@ def _make_bond_rank_input(
                 value=value,
                 min=1,
                 max=50,
-                size=60,
+                size=80,
             ),
         ],
         style={

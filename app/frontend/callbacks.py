@@ -170,9 +170,10 @@ def update_students(
     if trigger == "load-preset-btn":
         if not preset_name:
             raise PreventUpdate
-        students = get_preset_data(preset_name)
-        if not students:
+        result = get_preset_data(preset_name)
+        if not result:
             raise PreventUpdate
+        display_name, students = result
         new_children = []
         new_indices = []
         new_rank_children = []
@@ -195,13 +196,6 @@ def update_students(
             preset_costume_map[i] = s["costume_name"]
         new_order = list(range(len(students)))
         priority_data = _build_priority_data(new_order, preset_costume_map)
-        # ドロップダウン value からキャラ名を抽出
-        display_name = (
-            preset_name.split("::", 1)[-1] if "::" in preset_name else preset_name
-        )
-        # user:: の場合はキー末尾のタイムスタンプを除去
-        if preset_name.startswith("user::"):
-            display_name = display_name.rsplit("_", 1)[0]
         msg = html.P(
             f"プリセット「{display_name}」を読み込みました。",
             style={
