@@ -1,3 +1,61 @@
 {
-  "presets": {}
+  "presets": {
+    "ホシノ_1775885688": {
+      "character_name": "ホシノ",
+      "costumes": [
+        {
+          "costume_name": "衣装1",
+          "bond_bonuses": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "approved": false,
+      "submitted_at": "2026-04-11T05:34:48Z"
+    },
+    "ミカ_1775887823": {
+      "character_name": "ミカ",
+      "costumes": [
+        {
+          "costume_name": "衣装1",
+          "bond_bonuses": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "approved": false,
+      "submitted_at": "2026-04-11T06:10:23Z"
+    },
+    "ネル_1775890793": {
+      "character_name": "ネル",
+      "costumes": [
+        {
+          "costume_name": "衣装1",
+          "bond_bonuses": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "approved": false,
+      "submitted_at": "2026-04-11T06:59:53Z"
+    }
+  }
 }
