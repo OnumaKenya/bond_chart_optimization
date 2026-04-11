@@ -91,9 +91,7 @@ def admin_logout():
 def admin_presets():
     presets = load_user_presets()
 
-    range_headers = "".join(
-        f"<th>絆{lo}~{hi}</th>" for lo, hi in BOND_RANGES
-    )
+    range_headers = "".join(f"<th>絆{lo}~{hi}</th>" for lo, hi in BOND_RANGES)
 
     rows = ""
     for key, entry in sorted(
@@ -126,7 +124,7 @@ def admin_presets():
             )
         delete_btn = (
             f'<form method="post" action="/admin/presets/action" style="display:inline"'
-            f' onsubmit="return confirm(\'削除しますか？\')">'
+            f" onsubmit=\"return confirm('削除しますか？')\">"
             f'<input type="hidden" name="key" value="{ekey}">'
             f'<input type="hidden" name="action" value="delete">'
             f'<button type="submit" class="btn btn-delete">削除</button></form>'
