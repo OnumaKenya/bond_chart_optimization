@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 
+import dash_daq as daq
 from dash import html, dcc
 
 from app.backend.student import BOND_RANGES
@@ -14,7 +15,7 @@ else:
 
 _MANUAL_MD = (_BASE_DIR / "docs" / "manual.md").read_text(encoding="utf-8")
 
-LABEL_STYLE = {"fontSize": "0.85rem", "whiteSpace": "nowrap"}
+LABEL_STYLE = {"fontSize": "1rem", "whiteSpace": "nowrap"}
 
 
 def _default_costume_name(index: int) -> str:
@@ -37,15 +38,19 @@ def make_student_card(
             html.Div(
                 [
                     html.Label(f"絆{lo}~{hi}", style=LABEL_STYLE),
-                    dcc.Input(
+                    daq.NumericInput(
                         id={"type": "bond", "range_idx": i, "index": index},
-                        type="number",
                         value=bond_bonuses[i],
-                        step=1,
-                        style={"width": "100%"},
+                        min=0,
+                        max=9999,
+                        size=72,
                     ),
                 ],
-                style={"flex": "1", "minWidth": "70px"},
+                style={
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "alignItems": "center",
+                },
             )
         )
 
@@ -113,14 +118,12 @@ def _make_bond_rank_input(
                 id={"type": "bond-rank-label", "index": index},
                 style={**LABEL_STYLE, "textAlign": "center"},
             ),
-            dcc.Input(
+            daq.NumericInput(
                 id={"type": "bond-rank", "index": index},
-                type="number",
                 value=value,
                 min=1,
                 max=50,
-                step=1,
-                style={"width": "60px", "textAlign": "center"},
+                size=60,
             ),
         ],
         style={

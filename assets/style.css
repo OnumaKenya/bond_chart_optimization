@@ -61,10 +61,19 @@ input[type="number"] {
     to { transform: rotate(360deg); }
 }
 
+/* ── dash_daq NumericInput の余白調整 ── */
+.numeric-input {
+    margin: 0 !important;
+}
+.numeric-input input {
+    font-size: 1rem !important;
+}
+
 /* ── PC: 絆入力を7列1行に固定 ── */
 .bond-fields {
     display: grid !important;
-    grid-template-columns: repeat(7, 1fr) !important;
+    grid-template-columns: repeat(7, auto) !important;
+    gap: 8px !important;
 }
 
 /* ── モバイル対応 ── */
