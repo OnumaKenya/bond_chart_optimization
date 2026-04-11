@@ -195,13 +195,8 @@ def update_students(
             preset_costume_map[i] = s["costume_name"]
         new_order = list(range(len(students)))
         priority_data = _build_priority_data(new_order, preset_costume_map)
-        # ドロップダウン value からキャラ名を抽出
-        display_name = (
-            preset_name.split("::", 1)[-1] if "::" in preset_name else preset_name
-        )
-        # user:: の場合はキー末尾のタイムスタンプを除去
-        if preset_name.startswith("user::"):
-            display_name = display_name.rsplit("_", 1)[0]
+        # キーからキャラ名を抽出（末尾の _timestamp を除去）
+        display_name = preset_name.rsplit("_", 1)[0]
         msg = html.P(
             f"プリセット「{display_name}」を読み込みました。",
             style={

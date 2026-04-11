@@ -1,0 +1,1318 @@
+[
+  {
+    "key": "アコ_1775912687_22",
+    "character_name": "アコ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          1,
+          2,
+          3,
+          4,
+          1,
+          1,
+          2
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          1,
+          2,
+          3,
+          4,
+          1,
+          1,
+          2
+        ],
+        "costume_name": "ドレス"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:47Z"
+  },
+  {
+    "key": "アツコ(HP)_1775912690_36",
+    "character_name": "アツコ(HP)",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          0,
+          0,
+          115,
+          138,
+          24,
+          36,
+          60
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          0,
+          0,
+          54,
+          64,
+          11,
+          16,
+          27
+        ],
+        "costume_name": "水着"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:50Z"
+  },
+  {
+    "key": "アツコ(治癒力)_1775912690_35",
+    "character_name": "アツコ(治癒力)",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          5,
+          7,
+          9,
+          11,
+          3,
+          4,
+          7
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          8,
+          12,
+          16,
+          20,
+          5,
+          7,
+          12
+        ],
+        "costume_name": "水着"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:50Z"
+  },
+  {
+    "key": "アリス_1775912685_7",
+    "character_name": "アリス",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          3,
+          5,
+          7,
+          9,
+          3,
+          4,
+          7
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          4,
+          6,
+          8,
+          10,
+          3,
+          4,
+          6
+        ],
+        "costume_name": "メイド"
+      },
+      {
+        "bond_bonuses": [
+          4,
+          6,
+          8,
+          10,
+          2,
+          4,
+          6
+        ],
+        "costume_name": "臨戦"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:45Z"
+  },
+  {
+    "key": "アル_1775912687_18",
+    "character_name": "アル",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          4,
+          6,
+          7,
+          9,
+          2,
+          4,
+          6
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          5,
+          6,
+          8,
+          2,
+          3,
+          5
+        ],
+        "costume_name": "正月"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          4,
+          6,
+          7,
+          2,
+          3,
+          4
+        ],
+        "costume_name": "ドレス"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:47Z"
+  },
+  {
+    "key": "イズナ_1775912687_20",
+    "character_name": "イズナ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          2,
+          3,
+          4,
+          5,
+          1,
+          2,
+          3
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          2,
+          3,
+          4,
+          5,
+          1,
+          2,
+          3
+        ],
+        "costume_name": "水着"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:47Z"
+  },
+  {
+    "key": "カズサ_1775912686_15",
+    "character_name": "カズサ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          2,
+          4,
+          5,
+          6,
+          2,
+          2,
+          4
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          4,
+          5,
+          7,
+          2,
+          2,
+          4
+        ],
+        "costume_name": "バンド"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:46Z"
+  },
+  {
+    "key": "カヨコ_1775912686_14",
+    "character_name": "カヨコ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          1,
+          2,
+          2,
+          3,
+          1,
+          1,
+          2
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          1,
+          2,
+          3,
+          3,
+          1,
+          1,
+          2
+        ],
+        "costume_name": "正月"
+      },
+      {
+        "bond_bonuses": [
+          2,
+          3,
+          4,
+          5,
+          1,
+          2,
+          3
+        ],
+        "costume_name": "ドレス"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:46Z"
+  },
+  {
+    "key": "キキョウ_1775912688_28",
+    "character_name": "キキョウ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          2,
+          4,
+          5,
+          6,
+          1,
+          2,
+          4
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          0,
+          0,
+          6,
+          7,
+          1,
+          2,
+          3
+        ],
+        "costume_name": "水着"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:48Z"
+  },
+  {
+    "key": "サオリ_1775912686_13",
+    "character_name": "サオリ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          2,
+          3,
+          4,
+          5,
+          1,
+          2,
+          3
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          2,
+          4,
+          5,
+          7,
+          1,
+          2,
+          4
+        ],
+        "costume_name": "ドレス"
+      },
+      {
+        "bond_bonuses": [
+          2,
+          4,
+          5,
+          6,
+          1,
+          2,
+          4
+        ],
+        "costume_name": "水着"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:46Z"
+  },
+  {
+    "key": "シロコ_1775912685_8",
+    "character_name": "シロコ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          3,
+          4,
+          6,
+          7,
+          2,
+          3,
+          5
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          4,
+          6,
+          7,
+          2,
+          3,
+          5
+        ],
+        "costume_name": "ライディング"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          5,
+          6,
+          8,
+          2,
+          3,
+          5
+        ],
+        "costume_name": "水着"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:45Z"
+  },
+  {
+    "key": "タカネ(治癒力)_1775912690_34",
+    "character_name": "タカネ(治癒力)",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          2,
+          3,
+          4,
+          5,
+          1,
+          2,
+          3
+        ],
+        "costume_name": "通常"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:50Z"
+  },
+  {
+    "key": "トキ_1775912685_11",
+    "character_name": "トキ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          2,
+          3,
+          5,
+          6,
+          1,
+          2,
+          4
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          4,
+          5,
+          7,
+          2,
+          3,
+          4
+        ],
+        "costume_name": "バニー"
+      },
+      {
+        "bond_bonuses": [
+          2,
+          3,
+          4,
+          5,
+          1,
+          2,
+          3
+        ],
+        "costume_name": "臨戦"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:45Z"
+  },
+  {
+    "key": "ナギサ_1775912684_6",
+    "character_name": "ナギサ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          3,
+          4,
+          6,
+          7,
+          2,
+          3,
+          5
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          2,
+          4,
+          5,
+          6,
+          1,
+          2,
+          4
+        ],
+        "costume_name": "水着"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:44Z"
+  },
+  {
+    "key": "ネル_1775912684_4",
+    "character_name": "ネル",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          2,
+          3,
+          4,
+          5,
+          1,
+          2,
+          3
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          2,
+          4,
+          5,
+          6,
+          1,
+          2,
+          3
+        ],
+        "costume_name": "バニー"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          5,
+          6,
+          8,
+          2,
+          3,
+          5
+        ],
+        "costume_name": "制服"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:44Z"
+  },
+  {
+    "key": "ノア_1775912685_10",
+    "character_name": "ノア",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          1,
+          2,
+          2,
+          3,
+          1,
+          1,
+          2
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          1,
+          2,
+          3,
+          4,
+          1,
+          1,
+          2
+        ],
+        "costume_name": "パジャマ"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:45Z"
+  },
+  {
+    "key": "ノノミ_1775912688_27",
+    "character_name": "ノノミ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          3,
+          4,
+          5,
+          7,
+          2,
+          3,
+          4
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          4,
+          5,
+          7,
+          2,
+          3,
+          4
+        ],
+        "costume_name": "水着"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:48Z"
+  },
+  {
+    "key": "ハスミ_1775912687_19",
+    "character_name": "ハスミ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          3,
+          5,
+          7,
+          9,
+          2,
+          3,
+          6
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          5,
+          6,
+          8,
+          2,
+          3,
+          5
+        ],
+        "costume_name": "体操服"
+      },
+      {
+        "bond_bonuses": [
+          4,
+          5,
+          7,
+          9,
+          2,
+          3,
+          5
+        ],
+        "costume_name": "水着"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:47Z"
+  },
+  {
+    "key": "ハルカ(HP)_1775912689_32",
+    "character_name": "ハルカ(HP)",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          0,
+          0,
+          127,
+          152,
+          27,
+          40,
+          66
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          0,
+          0,
+          38,
+          45,
+          8,
+          12,
+          20
+        ],
+        "costume_name": "正月"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:49Z"
+  },
+  {
+    "key": "ヒナ_1775912684_3",
+    "character_name": "ヒナ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          3,
+          4,
+          5,
+          6,
+          2,
+          2,
+          4
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          5,
+          6,
+          8,
+          2,
+          3,
+          5
+        ],
+        "costume_name": "水着"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          5,
+          7,
+          9,
+          2,
+          3,
+          5
+        ],
+        "costume_name": "ドレス"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:44Z"
+  },
+  {
+    "key": "ヒナタ_1775912687_21",
+    "character_name": "ヒナタ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          2,
+          3,
+          3,
+          4,
+          1,
+          2,
+          3
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          5,
+          6,
+          8,
+          2,
+          3,
+          5
+        ],
+        "costume_name": "水着"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:47Z"
+  },
+  {
+    "key": "ヒビキ_1775912686_16",
+    "character_name": "ヒビキ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          2,
+          4,
+          5,
+          6,
+          2,
+          2,
+          4
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          7,
+          10,
+          13,
+          16,
+          4,
+          6,
+          11
+        ],
+        "costume_name": "応援団"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:46Z"
+  },
+  {
+    "key": "ヒヨリ_1775912688_26",
+    "character_name": "ヒヨリ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          2,
+          3,
+          4,
+          5,
+          1,
+          2,
+          3
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          4,
+          6,
+          8,
+          10,
+          2,
+          4,
+          6
+        ],
+        "costume_name": "水着"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:48Z"
+  },
+  {
+    "key": "フィーナ_1775912688_24",
+    "character_name": "フィーナ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          3,
+          4,
+          5,
+          6,
+          2,
+          2,
+          4
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          4,
+          6,
+          8,
+          1,
+          3,
+          5
+        ],
+        "costume_name": "ガイド"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:48Z"
+  },
+  {
+    "key": "フブキ_1775912688_23",
+    "character_name": "フブキ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          2,
+          4,
+          5,
+          6,
+          2,
+          2,
+          4
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          5,
+          6,
+          8,
+          2,
+          3,
+          5
+        ],
+        "costume_name": "水着"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:48Z"
+  },
+  {
+    "key": "ホシノ_1775912684_1",
+    "character_name": "ホシノ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          2,
+          3,
+          4,
+          5,
+          1,
+          2,
+          3
+        ],
+        "costume_name": "水着"
+      },
+      {
+        "bond_bonuses": [
+          2,
+          3,
+          4,
+          5,
+          1,
+          2,
+          3
+        ],
+        "costume_name": "臨戦"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:44Z"
+  },
+  {
+    "key": "マキ_1775912686_12",
+    "character_name": "マキ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          2,
+          3,
+          5,
+          6,
+          1,
+          2,
+          4
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          5,
+          6,
+          8,
+          2,
+          3,
+          5
+        ],
+        "costume_name": "キャンプ"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:46Z"
+  },
+  {
+    "key": "マリー(治癒力)_1775912689_33",
+    "character_name": "マリー(治癒力)",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          5,
+          8,
+          10,
+          13,
+          3,
+          5,
+          8
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          7,
+          10,
+          14,
+          17,
+          4,
+          7,
+          11
+        ],
+        "costume_name": "体操服"
+      },
+      {
+        "bond_bonuses": [
+          7,
+          10,
+          14,
+          17,
+          4,
+          6,
+          10
+        ],
+        "costume_name": "アイドル"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:49Z"
+  },
+  {
+    "key": "マリナ_1775912689_30",
+    "character_name": "マリナ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          0,
+          0,
+          3,
+          4,
+          1,
+          1,
+          2
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          4,
+          5,
+          7,
+          2,
+          2,
+          4
+        ],
+        "costume_name": "チーパオ"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:49Z"
+  },
+  {
+    "key": "ミカ_1775912684_2",
+    "character_name": "ミカ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          3,
+          4,
+          5,
+          7,
+          2,
+          3,
+          4
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          5,
+          6,
+          8,
+          2,
+          3,
+          5
+        ],
+        "costume_name": "水着"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:44Z"
+  },
+  {
+    "key": "ミサキ_1775912685_9",
+    "character_name": "ミサキ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          5,
+          8,
+          11,
+          14,
+          4,
+          5,
+          9
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          5,
+          6,
+          8,
+          2,
+          3,
+          5
+        ],
+        "costume_name": "水着"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:45Z"
+  },
+  {
+    "key": "ユカリ_1775912689_29",
+    "character_name": "ユカリ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          3,
+          5,
+          7,
+          8,
+          2,
+          3,
+          5
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          4,
+          5,
+          6,
+          1,
+          2,
+          4
+        ],
+        "costume_name": "水着"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:49Z"
+  },
+  {
+    "key": "ユズ_1775912688_25",
+    "character_name": "ユズ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          4,
+          5,
+          7,
+          9,
+          2,
+          3,
+          6
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          5,
+          7,
+          8,
+          2,
+          3,
+          5
+        ],
+        "costume_name": "メイド"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          4,
+          5,
+          6,
+          2,
+          2,
+          4
+        ],
+        "costume_name": "臨戦"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:48Z"
+  },
+  {
+    "key": "ヨシミ_1775912686_17",
+    "character_name": "ヨシミ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          3,
+          4,
+          5,
+          7,
+          2,
+          3,
+          4
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          3,
+          4,
+          5,
+          7,
+          2,
+          2,
+          4
+        ],
+        "costume_name": "バンド"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:46Z"
+  },
+  {
+    "key": "リオ_1775912684_5",
+    "character_name": "リオ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          2,
+          3,
+          4,
+          5,
+          1,
+          2,
+          3
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          2,
+          3,
+          4,
+          5,
+          1,
+          2,
+          3
+        ],
+        "costume_name": "臨戦"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:44Z"
+  },
+  {
+    "key": "レイサ(HP)_1775912689_31",
+    "character_name": "レイサ(HP)",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          46,
+          68,
+          91,
+          114,
+          29,
+          44,
+          74
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          0,
+          0,
+          55,
+          65,
+          11,
+          16,
+          27
+        ],
+        "costume_name": "マジカル"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:49Z"
+  },
+  {
+    "key": "ワカモ_1775912683_0",
+    "character_name": "ワカモ",
+    "costumes": [
+      {
+        "bond_bonuses": [
+          3,
+          5,
+          7,
+          9,
+          2,
+          3,
+          6
+        ],
+        "costume_name": "通常"
+      },
+      {
+        "bond_bonuses": [
+          4,
+          6,
+          7,
+          9,
+          2,
+          4,
+          6
+        ],
+        "costume_name": "水着"
+      }
+    ],
+    "approved": true,
+    "submitted_at": "2026-04-11T13:04:43Z"
+  }
+]
