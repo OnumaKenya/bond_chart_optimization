@@ -379,15 +379,6 @@ function _solver_calcChartSync(
         return rankMap[idx];
     });
 
-    // 全衣装の絆ランクが50の場合はエラー表示
-    var allMax = currentRanks.every(function (r) { return r >= 50; });
-    if (allMax) {
-        return _solver_h("P", {
-            children: "全ての衣装の絆ランクが50のため、計算できません。",
-            style: { color: "red", fontWeight: "bold" },
-        });
-    }
-
     var bondMap = {};
     idxOrder.forEach(function (idx) {
         bondMap[idx] = new Array(_solver_BOND_RANGES.length).fill(0);
@@ -879,6 +870,18 @@ window.dash_clientside.solver = {
             window.dash_clientside.no_update,
             window.dash_clientside.no_update,
         ];
+
+        // 全衣装の絆ランクが50の場合はエラー表示（Store は更新しない）
+        var allMax = rankValues.every(function (r) { return r >= 50; });
+        if (allMax) {
+            return [
+                _solver_h("P", {
+                    children: "全ての衣装の絆ランクが50のため、計算できません。",
+                    style: { color: "red", fontWeight: "bold" },
+                }),
+                window.dash_clientside.no_update,
+            ];
+        }
 
         // Store から優先度順序を取得
         var priorityOrder = [];
