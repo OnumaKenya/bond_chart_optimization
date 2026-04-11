@@ -1,11 +1,16 @@
 import os
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from dash import ALL, ClientsideFunction, Input, Output, State
 from flask import request
 from app import app as application
 from app.frontend.layout import create_layout
 import app.frontend.callbacks  # noqa: F401 - コールバック登録
 import app.backend.api  # noqa: F401 - API エンドポイント登録
+import app.backend.admin  # noqa: F401 - 管理画面登録
 
 application.layout = create_layout
 

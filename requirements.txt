@@ -47,6 +47,10 @@ plotly==6.6.0
     # via
     #   bond-chart-optimization
     #   dash
+psycopg2-binary==2.9.11
+    # via bond-chart-optimization
+python-dotenv==1.2.2
+    # via bond-chart-optimization
 requests==2.33.1
     # via dash
 retrying==1.4.2
