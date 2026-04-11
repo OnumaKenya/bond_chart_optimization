@@ -1,3 +1,23 @@
 {
-  "presets": {}
+  "presets": {
+    "アリス_1775903499": {
+      "character_name": "アリス",
+      "costumes": [
+        {
+          "costume_name": "衣装1",
+          "bond_bonuses": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      ],
+      "approved": false,
+      "submitted_at": "2026-04-11T10:31:39Z"
+    }
+  }
 }
