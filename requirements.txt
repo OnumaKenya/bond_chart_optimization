@@ -11,6 +11,10 @@ click==8.3.2
 colorama==0.4.6 ; sys_platform == 'win32'
     # via click
 dash==4.1.0
+    # via
+    #   bond-chart-optimization
+    #   dash-daq
+dash-daq==0.6.0
     # via bond-chart-optimization
 flask==3.1.3
     # via dash
@@ -33,6 +37,8 @@ narwhals==2.18.1
     # via plotly
 nest-asyncio==1.6.0
     # via dash
+numpy==2.4.4
+    # via bond-chart-optimization
 packaging==26.0
     # via
     #   gunicorn
