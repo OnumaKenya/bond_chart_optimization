@@ -194,25 +194,12 @@ input[type="number"] {
         white-space: nowrap;
     }
 
-    /* プリセットセクション */
-    .preset-section {
-        display: flex !important;
-        flex-wrap: wrap !important;
-        align-items: flex-end !important;
-        gap: 8px !important;
-    }
-    .preset-section > strong {
+    /* プリセットセクション: ドロップダウンを1行、ボタンを次の行 */
+    .preset-section .dash-dropdown {
         width: 100% !important;
     }
-    .preset-section .dash-dropdown {
-        flex: 1 !important;
-        min-width: 0 !important;
-    }
-    .preset-section button {
-        flex-shrink: 0 !important;
-        width: auto !important;
-        margin-top: 0 !important;
-        padding: 8px 20px !important;
+    #load-preset-btn {
+        padding: 8px 16px !important;
     }
 
     /* モーダル */

@@ -253,11 +253,39 @@ def create_layout() -> html.Div:
                             html.Div(
                                 [
                                     html.Strong("プリセット"),
-                                    dcc.Dropdown(
-                                        id="preset-dropdown",
-                                        options=get_all_presets_for_dropdown(),
-                                        placeholder="選択...",
-                                        style={"marginTop": "6px"},
+                                    html.Div(
+                                        [
+                                            html.Div(
+                                                dcc.Dropdown(
+                                                    id="preset-dropdown",
+                                                    options=get_all_presets_for_dropdown(),
+                                                    placeholder="選択...",
+                                                ),
+                                                style={"flex": "1", "minWidth": "0"},
+                                            ),
+                                            html.Button(
+                                                "☆",
+                                                id="fav-toggle-btn",
+                                                n_clicks=0,
+                                                title="お気に入りに追加/解除",
+                                                style={
+                                                    "flexShrink": "0",
+                                                    "background": "none",
+                                                    "border": "1px solid #ccc",
+                                                    "borderRadius": "4px",
+                                                    "cursor": "pointer",
+                                                    "fontSize": "1.1rem",
+                                                    "padding": "4px 10px",
+                                                    "lineHeight": "1",
+                                                },
+                                            ),
+                                        ],
+                                        style={
+                                            "display": "flex",
+                                            "gap": "6px",
+                                            "alignItems": "stretch",
+                                            "marginTop": "6px",
+                                        },
                                     ),
                                     html.Button(
                                         "読み込み",
@@ -548,6 +576,9 @@ def create_layout() -> html.Div:
             dcc.Store(id="solver-inputs"),
             dcc.Store(id="submit-preset-status"),
             dcc.Store(id="costume-priority-order", data=[{"idx": 0, "name": "衣装1"}]),
+            dcc.Store(id="autosave", storage_type="local"),
+            dcc.Store(id="favorites", storage_type="local", data=[]),
+            dcc.Interval(id="autosave-init", max_intervals=1, interval=200),
         ],
         className="page-container",
         style={
