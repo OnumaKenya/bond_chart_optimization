@@ -326,9 +326,7 @@ def save_autosave(
 ):
     if not indices:
         raise PreventUpdate
-    costumes = {
-        str(cid["index"]): cv for cv, cid in zip(costume_values, costume_ids)
-    }
+    costumes = {str(cid["index"]): cv for cv, cid in zip(costume_values, costume_ids)}
     ranks = {str(rid["index"]): rv for rv, rid in zip(rank_values, rank_ids)}
     bonds = {str(i): [0] * len(BOND_RANGES) for i in indices}
     for bid, bv in zip(bond_ids, bond_values):
@@ -430,9 +428,7 @@ def toggle_favorite(n_clicks, preset_value, favorites):
     Input("submit-preset-status", "data"),
 )
 def render_preset_options(favorites, _submit_status):
-    return _sort_options_with_favorites(
-        get_all_presets_for_dropdown(), favorites or []
-    )
+    return _sort_options_with_favorites(get_all_presets_for_dropdown(), favorites or [])
 
 
 @callback(
