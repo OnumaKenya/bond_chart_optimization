@@ -33,6 +33,19 @@ def _no_cache_dash_endpoints(response):
 # ===========================================================================
 
 
+# --- 絆ランク増減ボタン ---
+application.clientside_callback(
+    ClientsideFunction("solver", "bond_rank_inc_dec"),
+    Output({"type": "bond-rank", "index": ALL}, "value", allow_duplicate=True),
+    Input({"type": "bond-rank-inc", "index": ALL}, "n_clicks"),
+    Input({"type": "bond-rank-dec", "index": ALL}, "n_clicks"),
+    State({"type": "bond-rank", "index": ALL}, "value"),
+    State({"type": "bond-rank", "index": ALL}, "id"),
+    State({"type": "bond-rank-inc", "index": ALL}, "id"),
+    State({"type": "bond-rank-dec", "index": ALL}, "id"),
+    prevent_initial_call=True,
+)
+
 # --- チャート計算: ステップ1 スピナー表示 + 入力データ収集 ---
 application.clientside_callback(
     ClientsideFunction("solver", "collect_inputs"),

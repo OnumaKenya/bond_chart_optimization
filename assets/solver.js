@@ -853,6 +853,25 @@ function _solver_calcChartSync(
 window.dash_clientside = window.dash_clientside || {};
 window.dash_clientside.solver = {
     /**
+     * 絆ランク増減ボタン
+     */
+    bond_rank_inc_dec: function (incClicks, decClicks, values, rankIds, incIds, decIds) {
+        var triggered = window.dash_clientside.callback_context.triggered;
+        if (!triggered || triggered.length === 0 || !triggered[0].value) {
+            return values.map(function () { return window.dash_clientside.no_update; });
+        }
+        var trigId = JSON.parse(triggered[0].prop_id.split(".")[0]);
+        var targetIndex = trigId.index;
+        var isInc = trigId.type === "bond-rank-inc";
+
+        return rankIds.map(function (rid, i) {
+            if (rid.index !== targetIndex) return window.dash_clientside.no_update;
+            var cur = typeof values[i] === "number" ? values[i] : 20;
+            return isInc ? Math.min(50, cur + 1) : Math.max(1, cur - 1);
+        });
+    },
+
+    /**
      * ステップ1: スピナー表示 + 入力データを Store に格納
      */
     collect_inputs: function (
@@ -870,6 +889,33 @@ window.dash_clientside.solver = {
             window.dash_clientside.no_update,
             window.dash_clientside.no_update,
         ];
+
+        // 絆ランクの範囲チェック
+        var invalidNames = [];
+        for (var ri = 0; ri < rankValues.length; ri++) {
+            var rv = rankValues[ri];
+            if (rv === null || rv === undefined || typeof rv !== "number" ||
+                !isFinite(rv) || rv < 1 || rv > 50 || rv !== Math.floor(rv)) {
+                var cidx = rankIds[ri] ? rankIds[ri].index : ri;
+                var cname = null;
+                for (var ci = 0; ci < costumeIds.length; ci++) {
+                    if (costumeIds[ci].index === cidx) {
+                        cname = costumeValues[ci];
+                        break;
+                    }
+                }
+                invalidNames.push(cname || _solver_defaultCostumeName(cidx));
+            }
+        }
+        if (invalidNames.length > 0) {
+            return [
+                _solver_h("P", {
+                    children: "絆ランクは1〜50の整数で入力してください（" + invalidNames.join("、") + "）。",
+                    style: { color: "red", fontWeight: "bold" },
+                }),
+                window.dash_clientside.no_update,
+            ];
+        }
 
         // 全衣装の絆ランクが50の場合はエラー表示（Store は更新しない）
         var allMax = rankValues.every(function (r) { return r >= 50; });

@@ -262,6 +262,25 @@ def sync_bond_rank_labels(costume_values, costume_ids):
     ]
 
 
+_BOND_RANK_BASE_STYLE = {"width": "50px", "textAlign": "center"}
+_BOND_RANK_ERROR_STYLE = {**_BOND_RANK_BASE_STYLE, "border": "2px solid red", "color": "red"}
+
+
+@callback(
+    Output({"type": "bond-rank", "index": ALL}, "style"),
+    Input({"type": "bond-rank", "index": ALL}, "value"),
+)
+def validate_bond_rank_style(values):
+    return [
+        _BOND_RANK_ERROR_STYLE
+        if v is None or not isinstance(v, (int, float)) or v < 1 or v > 50
+        else _BOND_RANK_BASE_STYLE
+        for v in values
+    ]
+
+
+
+
 @callback(
     Output("costume-priority-container", "children"),
     Output("costume-priority-order", "data", allow_duplicate=True),
@@ -299,7 +318,6 @@ def render_and_reorder_priority(
 @callback(
     Output("autosave", "data"),
     Input({"type": "costume", "index": ALL}, "value"),
-    Input({"type": "bond", "range_idx": ALL, "index": ALL}, "value"),
     Input({"type": "bond-rank", "index": ALL}, "value"),
     Input("costume-priority-order", "data"),
     Input("bond50-penalty", "value"),
@@ -307,13 +325,11 @@ def render_and_reorder_priority(
     State("student-indices", "data"),
     State("next-student-index", "data"),
     State({"type": "costume", "index": ALL}, "id"),
-    State({"type": "bond", "range_idx": ALL, "index": ALL}, "id"),
     State({"type": "bond-rank", "index": ALL}, "id"),
     prevent_initial_call=True,
 )
 def save_autosave(
     costume_values,
-    bond_values,
     rank_values,
     priority_data,
     penalty,
@@ -321,23 +337,16 @@ def save_autosave(
     indices,
     next_index,
     costume_ids,
-    bond_ids,
     rank_ids,
 ):
     if not indices:
         raise PreventUpdate
     costumes = {str(cid["index"]): cv for cv, cid in zip(costume_values, costume_ids)}
     ranks = {str(rid["index"]): rv for rv, rid in zip(rank_values, rank_ids)}
-    bonds = {str(i): [0] * len(BOND_RANGES) for i in indices}
-    for bid, bv in zip(bond_ids, bond_values):
-        key = str(bid["index"])
-        if key in bonds:
-            bonds[key][bid["range_idx"]] = bv or 0
     return {
         "indices": indices,
         "next_index": next_index,
         "costumes": costumes,
-        "bonds": bonds,
         "ranks": ranks,
         "priority": priority_data,
         "penalty": penalty,
@@ -360,44 +369,50 @@ def save_autosave(
 def restore_autosave(_n, data):
     if not data or not data.get("indices"):
         raise PreventUpdate
-    indices = data["indices"]
-    next_index = data.get("next_index") or (max(indices) + 1 if indices else 1)
-    costumes = data.get("costumes") or {}
-    bonds = data.get("bonds") or {}
-    ranks = data.get("ranks") or {}
-    priority = data.get("priority") or []
-    penalty = data.get("penalty", 0)
 
-    student_children = [
-        make_student_card(
-            idx,
-            costume_name=costumes.get(str(idx), ""),
-            bond_bonuses=bonds.get(str(idx)) or [0] * len(BOND_RANGES),
-        )
-        for idx in indices
-    ]
-    rank_children = [
-        _make_bond_rank_input(
-            idx,
-            costume_name=costumes.get(str(idx), ""),
-            value=ranks.get(str(idx)) or 20,
-        )
-        for idx in indices
-    ]
-    if not priority:
-        priority = [
-            {"idx": i, "name": costumes.get(str(i)) or _default_costume_name(i)}
-            for i in indices
-        ]
-    return (
-        student_children,
-        indices,
-        next_index,
-        rank_children,
-        priority,
-        penalty if penalty is not None else 0,
-        data.get("preset_value"),
-    )
+    penalty = data.get("penalty", 0)
+    preset_value = data.get("preset_value")
+
+    # プリセットが選択されていればプリセットから復元
+    if preset_value:
+        result = get_preset_data(preset_value)
+        if result:
+            _, students = result
+            indices = list(range(len(students)))
+            next_index = len(students)
+            ranks = data.get("ranks") or {}
+            student_children = [
+                make_student_card(
+                    i,
+                    costume_name=s["costume_name"],
+                    bond_bonuses=s["bond_bonuses"],
+                )
+                for i, s in enumerate(students)
+            ]
+            rank_children = [
+                _make_bond_rank_input(
+                    i,
+                    costume_name=s["costume_name"],
+                    value=ranks.get(str(i)) or 20,
+                )
+                for i, s in enumerate(students)
+            ]
+            priority = [
+                {"idx": i, "name": s["costume_name"]}
+                for i, s in enumerate(students)
+            ]
+            return (
+                student_children,
+                indices,
+                next_index,
+                rank_children,
+                priority,
+                penalty if penalty is not None else 0,
+                preset_value,
+            )
+
+    # プリセット未選択: デフォルト状態（衣装1つ）
+    raise PreventUpdate
 
 
 @callback(

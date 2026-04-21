@@ -1,7 +1,6 @@
 import sys
 from pathlib import Path
 
-import dash_daq as daq
 from dash import html, dcc
 
 from app.backend.student import BOND_RANGES
@@ -38,12 +37,14 @@ def make_student_card(
             html.Div(
                 [
                     html.Label(f"絆{lo}~{hi}", style=LABEL_STYLE),
-                    daq.NumericInput(
+                    dcc.Input(
                         id={"type": "bond", "range_idx": i, "index": index},
+                        type="number",
                         value=bond_bonuses[i],
                         min=0,
-                        max=9999,
-                        size=72,
+                        debounce=True,
+                        autoComplete="off",
+                        style={"width": "72px", "textAlign": "center"},
                     ),
                 ],
                 style={
@@ -111,6 +112,19 @@ def _make_bond_rank_input(
     index: int, *, costume_name: str = "", value: int = 20
 ) -> html.Div:
     """衣装ごとの現在の絆ランク入力欄を1つ生成する。"""
+    btn_style = {
+        "width": "24px",
+        "height": "14px",
+        "border": "1px solid #ccc",
+        "background": "#f5f5f5",
+        "cursor": "pointer",
+        "fontSize": "0.65rem",
+        "lineHeight": "1",
+        "padding": "0",
+        "display": "flex",
+        "alignItems": "center",
+        "justifyContent": "center",
+    }
     return html.Div(
         [
             html.Label(
@@ -118,12 +132,37 @@ def _make_bond_rank_input(
                 id={"type": "bond-rank-label", "index": index},
                 style={**LABEL_STYLE, "textAlign": "center"},
             ),
-            daq.NumericInput(
-                id={"type": "bond-rank", "index": index},
-                value=value,
-                min=1,
-                max=50,
-                size=80,
+            html.Div(
+                [
+                    dcc.Input(
+                        id={"type": "bond-rank", "index": index},
+                        type="number",
+                        value=value,
+                        debounce=True,
+                        style={"width": "50px", "textAlign": "center"},
+                    ),
+                    html.Div(
+                        [
+                            html.Button(
+                                "▲",
+                                id={"type": "bond-rank-inc", "index": index},
+                                n_clicks=0,
+                                style={**btn_style, "borderRadius": "3px 3px 0 0"},
+                            ),
+                            html.Button(
+                                "▼",
+                                id={"type": "bond-rank-dec", "index": index},
+                                n_clicks=0,
+                                style={**btn_style, "borderRadius": "0 0 3px 3px"},
+                            ),
+                        ],
+                        style={
+                            "display": "flex",
+                            "flexDirection": "column",
+                        },
+                    ),
+                ],
+                style={"display": "flex", "alignItems": "center", "gap": "1px"},
             ),
         ],
         style={

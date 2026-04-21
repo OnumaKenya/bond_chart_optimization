@@ -216,11 +216,12 @@ class TestMakeBondRankInput:
         rank_inputs = _find_by_id(inp, {"type": "bond-rank", "index": 1})
         assert rank_inputs[0].value == 35
 
-    def test_min_max(self):
+    def test_has_inc_dec_buttons(self):
         inp = _make_bond_rank_input(0)
-        rank_inputs = _find_by_id(inp, {"type": "bond-rank", "index": 0})
-        assert rank_inputs[0].min == 1
-        assert rank_inputs[0].max == 50
+        dec_btns = _find_by_id(inp, {"type": "bond-rank-dec", "index": 0})
+        inc_btns = _find_by_id(inp, {"type": "bond-rank-inc", "index": 0})
+        assert len(dec_btns) == 1
+        assert len(inc_btns) == 1
 
     def test_label_default(self):
         inp = _make_bond_rank_input(2)
