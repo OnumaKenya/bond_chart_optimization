@@ -10,6 +10,7 @@ dependencies = [
     "numpy>=2.0.0",
     "plotly>=6.6.0",
     "psycopg2-binary>=2.9.0",
+    "pyscipopt>=5.0.0",
     "python-dotenv>=1.0.0",
 ]
 
@@ -19,3 +20,7 @@ dev = [
     "pytest>=9.0.2",
     "ruff>=0.11.0",
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# main.py は env を先に読み込むため load_dotenv() の後に import する
+"main.py" = ["E402"]

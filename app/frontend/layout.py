@@ -4,7 +4,7 @@ from pathlib import Path
 from dash import html, dcc
 
 from app.backend.student import BOND_RANGES
-from app.backend.user_presets import get_all_presets_for_dropdown
+from app.backend.user_presets import get_all_presets_for_dropdown, load_gifts
 
 # PyInstaller バンドル時は _MEIPASS、通常時はプロジェクトルート
 if getattr(sys, "frozen", False):
@@ -174,6 +174,36 @@ def _make_bond_rank_input(
     )
 
 
+def _contact_span(nowrap: bool = True) -> html.Span:
+    """不具合・要望報告の連絡先（フォーム / X アカウント）。"""
+    link_style = {"color": "#4a90d9", "textDecoration": "underline"}
+    style = {"fontSize": "0.85rem"}
+    if nowrap:
+        style["whiteSpace"] = "nowrap"
+    return html.Span(
+        [
+            "不具合・要望報告は",
+            html.A(
+                "フォーム",
+                href="https://forms.gle/yxJYDAY55TPDkMr39",
+                target="_blank",
+                rel="noopener noreferrer",
+                style=link_style,
+            ),
+            "か",
+            html.A(
+                "Xアカウント",
+                href="https://x.com/yankeiori",
+                target="_blank",
+                rel="noopener noreferrer",
+                style=link_style,
+            ),
+            "まで",
+        ],
+        style=style,
+    )
+
+
 def create_layout() -> html.Div:
     return html.Div(
         [
@@ -182,37 +212,7 @@ def create_layout() -> html.Div:
                     html.H1("絆上げ優先度計算機", style={"marginBottom": "0"}),
                     html.Div(
                         [
-                            html.Span(
-                                [
-                                    "不具合・要望報告は",
-                                    html.A(
-                                        "フォーム",
-                                        href="https://forms.gle/yxJYDAY55TPDkMr39",
-                                        target="_blank",
-                                        rel="noopener noreferrer",
-                                        style={
-                                            "color": "#4a90d9",
-                                            "textDecoration": "underline",
-                                        },
-                                    ),
-                                    "か",
-                                    html.A(
-                                        "Xアカウント",
-                                        href="https://x.com/yankeiori",
-                                        target="_blank",
-                                        rel="noopener noreferrer",
-                                        style={
-                                            "color": "#4a90d9",
-                                            "textDecoration": "underline",
-                                        },
-                                    ),
-                                    "まで",
-                                ],
-                                style={
-                                    "fontSize": "0.85rem",
-                                    "whiteSpace": "nowrap",
-                                },
-                            ),
+                            _contact_span(),
                             html.Button(
                                 "📖 マニュアル",
                                 id="open-manual-btn",
@@ -377,6 +377,23 @@ def create_layout() -> html.Div:
                                                 placeholder="生徒名を入力...",
                                                 style={
                                                     "width": "100%",
+                                                    "marginTop": "6px",
+                                                    "fontSize": "0.85rem",
+                                                },
+                                            ),
+                                            dcc.Dropdown(
+                                                id="submit-status-name",
+                                                options=[
+                                                    {"label": s, "value": s}
+                                                    for s in (
+                                                        "攻撃",
+                                                        "HP",
+                                                        "治癒力",
+                                                        "防御",
+                                                    )
+                                                ],
+                                                placeholder="ステータス名を選択...",
+                                                style={
                                                     "marginTop": "6px",
                                                     "fontSize": "0.85rem",
                                                 },
@@ -626,4 +643,350 @@ def create_layout() -> html.Div:
             "padding": "20px",
             "fontFamily": "sans-serif",
         },
+    )
+
+
+# ======================================================================
+# 贈り物配分シミュレータ（ページ）
+# ======================================================================
+
+# プリセットの好み/all 型に関わらず、常にデフォルト使用可とする贈り物。
+_GS_ALWAYS_USED = {"gift-select-box"}
+
+
+def gs_default_used(gift: dict, preferred: set | frozenset = frozenset()) -> bool:
+    """贈り物の使用フラグ既定値。
+
+    好み(preferred) に入る / type に all を含む / 常時使用対象 のとき可。
+    """
+    return (
+        gift["id"] in _GS_ALWAYS_USED
+        or gift["id"] in preferred
+        or "all" in gift["gift_type"]
+    )
+
+
+def _gs_gift_card(gift: dict, default_use: bool, qty: int = 0) -> html.Div:
+    """贈り物1件のコンパクトカード（アイコン・所持数・使用可否）。
+
+    名前は非表示で、マウスオーバー時に title で表示する。
+    """
+    gid = gift["id"]
+    is_high = gift["gift_type"] in ("high", "high-all")
+    return html.Div(
+        [
+            html.Img(
+                src=f"/assets/gift/{gid}.png",
+                style={"width": "34px", "height": "26px", "objectFit": "contain"},
+            ),
+            html.Div(
+                [
+                    dcc.Checklist(
+                        id={"type": "gs-gift-use", "gift": gid},
+                        options=[{"label": "", "value": "use"}],
+                        value=["use"] if default_use else [],
+                        style={"margin": "0"},
+                    ),
+                    dcc.Input(
+                        id={"type": "gs-gift-qty", "gift": gid},
+                        type="number",
+                        min=0,
+                        value=qty,
+                        debounce=True,
+                        style={
+                            "width": "38px",
+                            "textAlign": "center",
+                            "fontSize": "0.7rem",
+                            "padding": "1px",
+                        },
+                    ),
+                ],
+                style={"display": "flex", "alignItems": "center", "gap": "2px"},
+            ),
+        ],
+        className="gs-gift-card",
+        title=gift["name"],
+        style={
+            "display": "flex",
+            "flexDirection": "column",
+            "alignItems": "center",
+            "gap": "2px",
+            "padding": "3px",
+            "border": "1px solid #ccc",
+            "borderRadius": "4px",
+            "background": "#ede7f6" if is_high else "#fafafa",
+        },
+    )
+
+
+def _gs_gift_grid(cards: list) -> html.Div:
+    return html.Div(
+        cards,
+        style={
+            "display": "grid",
+            "gridTemplateColumns": "repeat(auto-fill, minmax(56px, 1fr))",
+            "gap": "4px",
+        },
+    )
+
+
+def build_gs_gift_list(
+    gifts: list[dict],
+    is_used,
+    qty_by_gift: dict | None = None,
+    use_by_gift: dict | None = None,
+) -> list:
+    """使用フラグONの贈り物のみ表示し、残りは折りたたみに格納する。
+
+    qty_by_gift / use_by_gift が与えられた場合は所持数・使用フラグの
+    保存値で上書きする（入力復元用）。
+
+    gs-gift-list の children として使う要素リストを返す。
+    """
+    qty_by_gift = qty_by_gift or {}
+    use_by_gift = use_by_gift or {}
+    used, unused = [], []
+    for g in gifts:
+        gid = g["id"]
+        if gid in use_by_gift:
+            u = bool(use_by_gift[gid])
+        else:
+            u = bool(is_used(g))
+        qty = qty_by_gift.get(gid, 0)
+        (used if u else unused).append(_gs_gift_card(g, u, qty))
+    children = []
+    if used:
+        children.append(_gs_gift_grid(used))
+    else:
+        children.append(
+            html.P(
+                "使用する贈り物がありません。",
+                style={"color": "#888", "fontSize": "0.8rem", "margin": "4px 0"},
+            )
+        )
+    if unused:
+        children.append(
+            html.Details(
+                [
+                    html.Summary(
+                        f"使用しない贈り物 ({len(unused)})",
+                        style={
+                            "cursor": "pointer",
+                            "fontSize": "0.85rem",
+                            "margin": "10px 0 4px",
+                            "color": "#666",
+                        },
+                    ),
+                    html.P(
+                        "使用する場合はチェックを付けて所持数を入力してください。",
+                        style={
+                            "fontSize": "0.78rem",
+                            "color": "#888",
+                            "margin": "4px 0 8px",
+                        },
+                    ),
+                    _gs_gift_grid(unused),
+                ]
+            )
+        )
+    return children
+
+
+def create_gift_simulator_layout() -> html.Div:
+    """贈り物配分シミュレータページ（入力部）。"""
+    gifts = load_gifts()
+    # プリセット未読込時は好み無し（all 型・常時使用対象のみ可）
+    gift_list_children = build_gs_gift_list(gifts, lambda g: gs_default_used(g))
+    return html.Div(
+        [
+            html.H1("贈り物配分シミュレータ(β版)", style={"marginBottom": "4px"}),
+            html.Div(
+                _contact_span(nowrap=False),
+                style={"marginBottom": "16px"},
+            ),
+            # プリセット読み込み
+            html.Div(
+                [
+                    html.Strong("プリセット"),
+                    html.Div(
+                        dcc.Dropdown(
+                            id="gs-preset-dropdown",
+                            options=get_all_presets_for_dropdown(),
+                            placeholder="選択...",
+                        ),
+                        style={"marginTop": "6px"},
+                    ),
+                    html.Button(
+                        "読み込み",
+                        id="gs-load-preset-btn",
+                        n_clicks=0,
+                        style={
+                            "marginTop": "8px",
+                            "background": "#27ae60",
+                            "color": "white",
+                            "border": "none",
+                            "borderRadius": "4px",
+                            "padding": "6px 16px",
+                            "cursor": "pointer",
+                        },
+                    ),
+                    html.Div(
+                        id="gs-load-feedback",
+                        style={"marginTop": "6px", "fontSize": "0.85rem"},
+                    ),
+                ],
+                style={
+                    "padding": "12px",
+                    "border": "1px solid #ccc",
+                    "borderRadius": "8px",
+                    "background": "#f5f5ff",
+                    "marginBottom": "16px",
+                    "maxWidth": "420px",
+                },
+            ),
+            # 衣装・上昇量（表示のみ）＋ 現在の絆ランク入力
+            html.Div(
+                [
+                    html.Strong("衣装 / 現在の絆ランク / 絆ボーナス"),
+                    html.Div(
+                        id="gs-costume-display",
+                        children=html.P(
+                            "プリセットを読み込んでください。",
+                            style={"color": "#888", "margin": "8px 0"},
+                        ),
+                        style={"marginTop": "8px"},
+                    ),
+                ],
+                style={
+                    "padding": "12px",
+                    "border": "1px solid #ccc",
+                    "borderRadius": "8px",
+                    "marginBottom": "16px",
+                },
+            ),
+            # 贈り物リスト
+            html.Div(
+                [
+                    html.Strong("贈り物（所持数・使用可否）"),
+                    html.Div(
+                        gift_list_children,
+                        id="gs-gift-list",
+                        style={"marginTop": "8px"},
+                    ),
+                ],
+                style={
+                    "padding": "12px",
+                    "border": "1px solid #ccc",
+                    "borderRadius": "8px",
+                },
+            ),
+            # 計算開始
+            html.Div(
+                [
+                    html.Button(
+                        "計算開始",
+                        id="gs-calc-btn",
+                        n_clicks=0,
+                        style={
+                            "background": "#4a90d9",
+                            "color": "white",
+                            "border": "none",
+                            "borderRadius": "4px",
+                            "padding": "10px 32px",
+                            "fontSize": "1rem",
+                            "cursor": "pointer",
+                        },
+                    ),
+                    dcc.Loading(
+                        type="circle",
+                        children=html.Div(
+                            id="gs-calc-result",
+                            style={"marginTop": "12px", "minHeight": "24px"},
+                        ),
+                    ),
+                ],
+                style={"marginTop": "16px"},
+            ),
+            dcc.Store(id="gs-loaded-preset"),
+            dcc.Store(id="gs-autosave", storage_type="local"),
+            dcc.Interval(id="gs-autosave-init", max_intervals=1, interval=300),
+        ],
+        className="page-container",
+        style={
+            "maxWidth": "1200px",
+            "margin": "0 auto",
+            "padding": "20px",
+            "fontFamily": "sans-serif",
+        },
+    )
+
+
+# ======================================================================
+# ルートレイアウト（URL ルーティング）
+# ======================================================================
+
+# パス → ページ。ルーティングコールバックと共有する。
+PAGES = {
+    "/": ("絆上げ優先度計算機", create_layout),
+    "/gift-sim": ("贈り物配分シミュレータ(β版)", create_gift_simulator_layout),
+}
+
+
+def _nav_bar() -> html.Div:
+    """全ページ共通のナビゲーションバー（タブ風で視認性を確保）。"""
+    link_style = {
+        "padding": "8px 20px",
+        "textDecoration": "none",
+        "color": "#4a90d9",
+        "fontWeight": "bold",
+        "fontSize": "0.95rem",
+        "border": "1px solid #4a90d9",
+        "borderRadius": "6px",
+        "background": "#fff",
+        "whiteSpace": "nowrap",
+    }
+    return html.Div(
+        [
+            html.Span(
+                "ページ切替",
+                style={
+                    "color": "#666",
+                    "fontSize": "0.85rem",
+                    "fontWeight": "bold",
+                    "marginRight": "4px",
+                },
+            ),
+            *[
+                dcc.Link(
+                    label,
+                    href=path,
+                    className="global-nav-link",
+                    style=link_style,
+                )
+                for path, (label, _) in PAGES.items()
+            ],
+        ],
+        className="global-nav",
+        style={
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "12px",
+            "padding": "12px 20px",
+            "borderBottom": "3px solid #4a90d9",
+            "background": "#eef4fb",
+            "boxShadow": "0 2px 4px rgba(0,0,0,0.08)",
+            "fontFamily": "sans-serif",
+            "marginBottom": "8px",
+        },
+    )
+
+
+def create_root_layout() -> html.Div:
+    """dcc.Location によるページ切り替えのルートシェル。"""
+    return html.Div(
+        [
+            dcc.Location(id="url"),
+            _nav_bar(),
+            html.Div(id="page-content"),
+        ]
     )
