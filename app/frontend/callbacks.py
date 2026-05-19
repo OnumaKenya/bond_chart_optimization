@@ -62,15 +62,20 @@ def display_page(pathname):
 # ----------------------------------------------------------------------
 
 
-def _gs_costume_rows(costumes: list[dict], rank_by_index=None) -> list:
-    """衣装ごとに 衣装名 / 絆ボーナス(表示のみ) / 現在の絆ランク入力 を生成。
+def _gs_costume_rows(
+    costumes: list[dict], rank_by_index=None, remain_by_index=None
+) -> list:
+    """衣装ごとに 衣装名 / 絆ボーナス(表示のみ) / 現在の絆ランク入力 /
+    次の絆上昇までの残り経験値(任意) を生成。
 
-    rank_by_index が与えられた場合は現在の絆ランクの保存値で上書きする。
+    rank_by_index / remain_by_index が与えられた場合は保存値で上書きする。
     """
     rank_by_index = rank_by_index or {}
+    remain_by_index = remain_by_index or {}
     rows = []
     for i, c in enumerate(costumes):
         rank_val = rank_by_index.get(i, rank_by_index.get(str(i), 20))
+        remain_val = remain_by_index.get(i, remain_by_index.get(str(i), None))
         bonus_cells = [
             html.Span(
                 f"絆{lo}~{hi}: {c['bond_bonuses'][j]}",
@@ -102,6 +107,23 @@ def _gs_costume_rows(costumes: list[dict], rank_by_index=None) -> list:
                                 debounce=True,
                                 style={"width": "60px", "textAlign": "center"},
                             ),
+                            html.Span(
+                                "次の絆まで残りEXP: ",
+                                style={"fontSize": "0.8rem", "marginLeft": "8px"},
+                                title=(
+                                    "次の絆ランクまでの残り経験値（任意）。"
+                                    "空欄なら現在ランクの開始（経験値0）として計算。"
+                                ),
+                            ),
+                            dcc.Input(
+                                id={"type": "gs-bond-remain", "index": i},
+                                type="number",
+                                min=1,
+                                value=remain_val,
+                                debounce=True,
+                                placeholder="任意",
+                                style={"width": "72px", "textAlign": "center"},
+                            ),
                         ],
                         style={
                             "flexShrink": "0",
@@ -125,9 +147,9 @@ def _gs_costume_rows(costumes: list[dict], rank_by_index=None) -> list:
     return rows
 
 
-def _gs_build_view(preset_value, ranks=None, qty=None, use=None):
+def _gs_build_view(preset_value, ranks=None, qty=None, use=None, remain=None):
     """プリセットから 衣装表示 / フィードバック / loaded-store /
-    贈り物リスト を構築する。ranks/qty/use は保存値の上書き（復元用）。
+    贈り物リスト を構築する。ranks/qty/use/remain は保存値の上書き（復元用）。
 
     Returns (costume_children, feedback, store_data, gift_list_children)
     または失敗時 (None, error_span, None, None)。
@@ -155,7 +177,7 @@ def _gs_build_view(preset_value, ranks=None, qty=None, use=None):
         f"「{display_name}」を読み込みました。", style={"color": "#27ae60"}
     )
     return (
-        _gs_costume_rows(costumes, rank_by_index=ranks),
+        _gs_costume_rows(costumes, rank_by_index=ranks, remain_by_index=remain),
         feedback,
         {
             "student_name": student_name,
@@ -198,9 +220,11 @@ def gs_load_preset(n_clicks, preset_value):
     Output("gs-autosave", "data"),
     Input("gs-preset-dropdown", "value"),
     Input({"type": "gs-bond-rank", "index": ALL}, "value"),
+    Input({"type": "gs-bond-remain", "index": ALL}, "value"),
     Input({"type": "gs-gift-qty", "gift": ALL}, "value"),
     Input({"type": "gs-gift-use", "gift": ALL}, "value"),
     State({"type": "gs-bond-rank", "index": ALL}, "id"),
+    State({"type": "gs-bond-remain", "index": ALL}, "id"),
     State({"type": "gs-gift-qty", "gift": ALL}, "id"),
     State({"type": "gs-gift-use", "gift": ALL}, "id"),
     prevent_initial_call=True,
@@ -208,15 +232,22 @@ def gs_load_preset(n_clicks, preset_value):
 def gs_save_autosave(
     preset_value,
     rank_values,
+    remain_values,
     qty_values,
     use_values,
     rank_ids,
+    remain_ids,
     qty_ids,
     use_ids,
 ):
     ranks = {
         str(rid["index"]): rv
         for rv, rid in zip(rank_values, rank_ids)
+        if rv is not None
+    }
+    remain = {
+        str(rid["index"]): rv
+        for rv, rid in zip(remain_values, remain_ids)
         if rv is not None
     }
     qty = {}
@@ -231,6 +262,7 @@ def gs_save_autosave(
     return {
         "preset_value": preset_value,
         "ranks": ranks,
+        "remain": remain,
         "qty": qty,
         "use": use,
     }
@@ -253,6 +285,7 @@ def gs_restore_autosave(_n, data):
     qty = data.get("qty") or {}
     use = data.get("use") or {}
     ranks = data.get("ranks") or {}
+    remain = data.get("remain") or {}
 
     if not preset_value:
         # プリセット未選択でも所持数・使用フラグは復元する
@@ -266,7 +299,7 @@ def gs_restore_autosave(_n, data):
         return (None, no_update, no_update, no_update, gift_list)
 
     costume_children, feedback, store, gift_list = _gs_build_view(
-        preset_value, ranks=ranks, qty=qty, use=use
+        preset_value, ranks=ranks, qty=qty, use=use, remain=remain
     )
     if store is None:
         raise PreventUpdate
@@ -409,6 +442,8 @@ def _gs_result_table(
     State({"type": "gs-gift-qty", "gift": ALL}, "id"),
     State({"type": "gs-bond-rank", "index": ALL}, "value"),
     State({"type": "gs-bond-rank", "index": ALL}, "id"),
+    State({"type": "gs-bond-remain", "index": ALL}, "value"),
+    State({"type": "gs-bond-remain", "index": ALL}, "id"),
     prevent_initial_call=True,
 )
 def gs_calculate(
@@ -420,6 +455,8 @@ def gs_calculate(
     qty_ids,
     rank_values,
     rank_ids,
+    remain_values,
+    remain_ids,
 ):
     """MILP(SCIP) で贈り物配分を最適化し、マトリクスを表示する。"""
     if not loaded:
@@ -439,6 +476,20 @@ def gs_calculate(
         except (TypeError, ValueError):
             v = 20
         current_ranks.append(min(50, max(1, v)))
+
+    # 次の絆上昇までの残り経験値（任意・衣装index順）。
+    # 未入力/不正/0以下は None（= 通常どおりレベル満額を要求）。
+    remain_by_idx = {rid["index"]: rv for rv, rid in zip(remain_values, remain_ids)}
+    remaining_exp: list[int | None] = []
+    for i in range(len(costumes)):
+        rv = remain_by_idx.get(i)
+        try:
+            rv = int(rv)
+        except (TypeError, ValueError):
+            rv = None
+        if rv is not None and rv <= 0:
+            rv = None
+        remaining_exp.append(rv)
 
     # 使用フラグ・所持数
     used_ids = {
@@ -515,7 +566,13 @@ def gs_calculate(
     bond_bonuses = [c["bond_bonuses"] for c in costumes]
 
     try:
-        result = solve_gift_distribution(current_ranks, bond_bonuses, gift_qty, value)
+        result = solve_gift_distribution(
+            current_ranks,
+            bond_bonuses,
+            gift_qty,
+            value,
+            remaining_exp=remaining_exp,
+        )
     except Exception as e:
         return html.Span(f"計算エラー: {e}", style={"color": "red"})
 

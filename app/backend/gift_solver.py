@@ -43,6 +43,7 @@ def solve_gift_distribution(
     gift_qty: list[int],
     value: list[list[int]],
     time_limit: float = DEFAULT_TIME_LIMIT,
+    remaining_exp: list[int | None] | None = None,
 ) -> dict:
     """贈り物配分 MILP を解く。
 
@@ -58,6 +59,12 @@ def solve_gift_distribution(
         value[g][c] = 贈り物 g を衣装 c に 1 個使ったときの獲得EXP。
     time_limit : float
         SCIP の制限時間（秒）。
+    remaining_exp : list[int | None] | None
+        衣装ごとの「次の絆上昇までの残り経験値」。指定された衣装は
+        最初のランクアップ (r0 -> r0+1) の必要EXPをこの値で上書きする
+        （途中まで経験値が貯まっているケース）。None / 該当要素が
+        None・0以下 の場合は通常どおりレベル満額を要求する。値は
+        [1, 満額] にクランプする。
 
     Returns
     -------
@@ -104,10 +111,21 @@ def solve_gift_distribution(
         # 連続性: 上位ランクアップは下位を前提
         for r in range(r0 + 2, _MAX_RANK + 1):
             model.addCons(delta[c, r] <= delta[c, r - 1])
-        # 消費EXP <= 獲得EXP
-        consumed = quicksum(
-            _level_exp(r) * delta[c, r] for r in range(r0 + 1, _MAX_RANK + 1)
+        # 各ランクアップの必要EXP。最初の r0 -> r0+1 のみ「次の絆上昇
+        # までの残り経験値」で上書きできる（途中まで貯まっている場合）。
+        rem = (
+            remaining_exp[c]
+            if remaining_exp is not None and c < len(remaining_exp)
+            else None
         )
+        cost = {}
+        for r in range(r0 + 1, _MAX_RANK + 1):
+            base = _level_exp(r)
+            if r == r0 + 1 and rem is not None and int(rem) > 0:
+                base = max(1, min(int(rem), base))
+            cost[r] = base
+        # 消費EXP <= 獲得EXP
+        consumed = quicksum(cost[r] * delta[c, r] for r in range(r0 + 1, _MAX_RANK + 1))
         gained = quicksum(value[g][c] * x[g, c] for g in range(m))
         model.addCons(consumed <= gained)
 
