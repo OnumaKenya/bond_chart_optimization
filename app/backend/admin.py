@@ -38,6 +38,14 @@ _TIER_LABELS = {
     "ultraFavorite": "最も好み (特大)",
 }
 
+# present.tier -> リアクションアイコン (assets/reaction/<name>.png)。
+# gift_exp._TIER_TO_EFFECTIVITY と同じ対応。
+_TIER_ICON = {
+    "favorite": "favorite",
+    "superFavorite": "super",
+    "ultraFavorite": "ultra",
+}
+
 # present の対象になり得る贈り物タイプ。all 型・贈り物選択ボックスは
 # tier (好み) を持たないため編集対象外。
 _PRESENT_GIFT_TYPES = ("normal", "high")
@@ -184,6 +192,12 @@ _STYLE = """
   .present-link { color: #2980b9; text-decoration: none; font-size: 0.8rem;
                   white-space: nowrap; }
   .present-link:hover { text-decoration: underline; }
+  .char-info { display: flex; flex-wrap: wrap; gap: 18px; align-items: center;
+               background: #eef6ff; border: 1px solid #cfe3f7;
+               border-radius: 6px; padding: 10px 14px; margin: 8px 0 12px;
+               font-size: 0.95rem; }
+  .char-info b { color: #1565c0; }
+  .char-info-id { margin-left: auto; color: #888; font-size: 0.75rem; }
   .gift-thumb { width: 30px; height: 30px; vertical-align: middle;
                 margin-right: 8px; }
   .gift-name { vertical-align: middle; }
@@ -192,8 +206,20 @@ _STYLE = """
             box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; }
   .picker select { min-width: 320px; }
   .badge-present { background: #d4edda; color: #155724; }
-  td.tier-cell { width: 220px; }
+  td.tier-cell { width: 250px; }
   tr.has-present { background: #fffceb; }
+  .tier-group { display: flex; gap: 6px; align-items: stretch; }
+  .tier-opt { display: inline-flex; align-items: center; justify-content: center;
+              cursor: pointer; border: 2px solid transparent; border-radius: 6px;
+              padding: 3px; min-width: 40px; }
+  .tier-opt input { position: absolute; opacity: 0; pointer-events: none; }
+  .tier-opt img { width: 30px; height: 30px; display: block;
+                  filter: grayscale(1); opacity: 0.4; transition: 0.1s; }
+  .tier-opt input:checked + img { filter: none; opacity: 1; }
+  .tier-opt:has(input:checked) { border-color: #2980b9; background: #eaf3fb; }
+  .tier-none { font-size: 0.8rem; color: #999; padding: 0 4px; }
+  .tier-opt:has(input:checked) .tier-none { color: #2980b9; font-weight: bold; }
+  .tier-opt:hover { background: #f0f0f0; }
 </style>
 """
 
@@ -621,9 +647,11 @@ def _costume_picker(costumes: list[dict], selected_id: int | None) -> str:
         opts.append(f'<optgroup label="{escape(student)}">')
         for c in items:
             sel = " selected" if c["costume_id"] == selected_id else ""
+            # optgroup ラベル(生徒名)は選択後の折り畳み表示に出ないため、
+            # option 自体に生徒名を含めて自己説明的にする。
+            label = f"{c['student_name']} / {_costume_label(c)}"
             opts.append(
-                f'<option value="{c["costume_id"]}"{sel}>'
-                f"{escape(_costume_label(c))}</option>"
+                f'<option value="{c["costume_id"]}"{sel}>{escape(label)}</option>'
             )
         opts.append("</optgroup>")
     return (
@@ -654,11 +682,28 @@ def _costume_picker(costumes: list[dict], selected_id: int | None) -> str:
 
 
 def _tier_select(gift_id: str, current: str) -> str:
-    opts = [f'<option value=""{"" if current else " selected"}>― なし ―</option>']
+    """好み(tier)選択。リアクションアイコンのラジオで表示する。
+
+    <select>/<option> は画像を表示できないため、アイコン付きラジオ
+    ボタングループにする。各 gift で 1 つだけ選択（同 name のラジオ）。
+    """
+    name = f"g_{escape(gift_id)}"
+    none_chk = "" if current else " checked"
+    parts = [
+        f'<label class="tier-opt tier-opt-none" title="好みなし">'
+        f'<input type="radio" name="{name}" value=""{none_chk}>'
+        f'<span class="tier-none">なし</span></label>'
+    ]
     for t in VALID_PRESENT_TIERS:
-        sel = " selected" if current == t else ""
-        opts.append(f'<option value="{t}"{sel}>{escape(_TIER_LABELS[t])}</option>')
-    return f'<select name="g_{escape(gift_id)}">{"".join(opts)}</select>'
+        chk = " checked" if current == t else ""
+        lbl = escape(_TIER_LABELS[t])
+        parts.append(
+            f'<label class="tier-opt" title="{lbl}">'
+            f'<input type="radio" name="{name}" value="{t}"{chk}>'
+            f'<img src="/assets/reaction/{_TIER_ICON[t]}.png" alt="{lbl}">'
+            f"</label>"
+        )
+    return f'<div class="tier-group">{"".join(parts)}</div>'
 
 
 def _present_editor(costume_id: int) -> str:
@@ -687,7 +732,13 @@ def _present_editor(costume_id: int) -> str:
 
     set_count = sum(1 for g in gifts if present.get(g["id"]))
     return f"""
-    <h2>{title} / {cname} の好み — 設定済み {set_count} 件</h2>
+    <h2>好みを編集</h2>
+    <div class="char-info">
+      <span>生徒: <b>{title}</b></span>
+      <span>衣装: <b>{cname}</b></span>
+      <span>登録済みの好み: <b>{set_count}</b> 件</span>
+      <span class="char-info-id">costume_id={costume_id}</span>
+    </div>
     <div class="summary">「なし」のままの贈り物は present から削除されます。
       tier は EXP 計算に影響します（中=favorite / 大=superFavorite /
       特大=ultraFavorite）。</div>
@@ -700,8 +751,9 @@ def _present_editor(costume_id: int) -> str:
         <tbody>{rows}</tbody>
       </table>
       <button type="button" class="btn-delete"
-              onclick="document.querySelectorAll('table select')
-                       .forEach(function(s){{s.value='';}})">
+              onclick="document.querySelectorAll(
+                       'table input[type=radio][value=&quot;&quot;]')
+                       .forEach(function(r){{r.checked=true;}})">
         全て「なし」に</button>
       <button type="submit" class="btn-add">この衣装の好みを保存</button>
     </form>"""
