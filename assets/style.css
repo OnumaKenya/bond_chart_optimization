@@ -1,8 +1,8 @@
-/* ページ切替ナビ */
-.global-nav-link {
+/* ページ切替リンク（タイトル横） */
+.page-switch-link {
     transition: background 0.12s, color 0.12s;
 }
-.global-nav-link:hover {
+.page-switch-link:hover {
     background: #4a90d9 !important;
     color: #fff !important;
 }

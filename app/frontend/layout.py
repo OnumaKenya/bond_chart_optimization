@@ -204,12 +204,46 @@ def _contact_span(nowrap: bool = True) -> html.Span:
     )
 
 
+def _page_switch_link(current_path: str) -> dcc.Link:
+    """現在のページ以外のページへ切り替えるリンク（タイトル横に配置）。"""
+    target_path, target_label = next(
+        (path, label) for path, (label, _) in PAGES.items() if path != current_path
+    )
+    return dcc.Link(
+        f"🔀 {target_label}",
+        href=target_path,
+        className="page-switch-link",
+        style={
+            "fontSize": "0.9rem",
+            "color": "#4a90d9",
+            "fontWeight": "bold",
+            "textDecoration": "none",
+            "border": "1px solid #4a90d9",
+            "borderRadius": "6px",
+            "padding": "6px 14px",
+            "background": "#fff",
+            "whiteSpace": "nowrap",
+        },
+    )
+
+
 def create_layout() -> html.Div:
     return html.Div(
         [
             html.Div(
                 [
-                    html.H1("絆上げ優先度計算機", style={"marginBottom": "0"}),
+                    html.Div(
+                        [
+                            html.H1("絆上げ優先度計算機", style={"margin": "0"}),
+                            _page_switch_link("/chart-opt"),
+                        ],
+                        style={
+                            "display": "flex",
+                            "alignItems": "center",
+                            "gap": "16px",
+                            "flexWrap": "wrap",
+                        },
+                    ),
                     html.Div(
                         [
                             _contact_span(),
@@ -799,7 +833,19 @@ def create_gift_simulator_layout() -> html.Div:
     gift_list_children = build_gs_gift_list(gifts, lambda g: gs_default_used(g))
     return html.Div(
         [
-            html.H1("贈り物配分シミュレータ(β版)", style={"marginBottom": "4px"}),
+            html.Div(
+                [
+                    html.H1("贈り物配分シミュレータ(β版)", style={"margin": "0"}),
+                    _page_switch_link("/gift-simulation"),
+                ],
+                style={
+                    "display": "flex",
+                    "alignItems": "center",
+                    "gap": "16px",
+                    "flexWrap": "wrap",
+                    "marginBottom": "4px",
+                },
+            ),
             html.Div(
                 _contact_span(nowrap=False),
                 style={"marginBottom": "16px"},
@@ -808,6 +854,25 @@ def create_gift_simulator_layout() -> html.Div:
             html.Div(
                 [
                     html.Strong("プリセット"),
+                    html.P(
+                        [
+                            "プリセットの追加は",
+                            dcc.Link(
+                                "絆上げ優先度計算機",
+                                href="/chart-opt",
+                                style={
+                                    "color": "#4a90d9",
+                                    "textDecoration": "underline",
+                                },
+                            ),
+                            "から行ってください。",
+                        ],
+                        style={
+                            "fontSize": "0.8rem",
+                            "color": "#666",
+                            "margin": "6px 0 0 0",
+                        },
+                    ),
                     html.Div(
                         dcc.Dropdown(
                             id="gs-preset-dropdown",
@@ -927,58 +992,12 @@ def create_gift_simulator_layout() -> html.Div:
 
 # パス → ページ。ルーティングコールバックと共有する。
 PAGES = {
-    "/": ("絆上げ優先度計算機", create_layout),
-    "/gift-sim": ("贈り物配分シミュレータ(β版)", create_gift_simulator_layout),
+    "/chart-opt": ("絆上げ優先度計算機", create_layout),
+    "/gift-simulation": ("贈り物配分シミュレータ(β版)", create_gift_simulator_layout),
 }
 
-
-def _nav_bar() -> html.Div:
-    """全ページ共通のナビゲーションバー（タブ風で視認性を確保）。"""
-    link_style = {
-        "padding": "8px 20px",
-        "textDecoration": "none",
-        "color": "#4a90d9",
-        "fontWeight": "bold",
-        "fontSize": "0.95rem",
-        "border": "1px solid #4a90d9",
-        "borderRadius": "6px",
-        "background": "#fff",
-        "whiteSpace": "nowrap",
-    }
-    return html.Div(
-        [
-            html.Span(
-                "ページ切替",
-                style={
-                    "color": "#666",
-                    "fontSize": "0.85rem",
-                    "fontWeight": "bold",
-                    "marginRight": "4px",
-                },
-            ),
-            *[
-                dcc.Link(
-                    label,
-                    href=path,
-                    className="global-nav-link",
-                    style=link_style,
-                )
-                for path, (label, _) in PAGES.items()
-            ],
-        ],
-        className="global-nav",
-        style={
-            "display": "flex",
-            "alignItems": "center",
-            "gap": "12px",
-            "padding": "12px 20px",
-            "borderBottom": "3px solid #4a90d9",
-            "background": "#eef4fb",
-            "boxShadow": "0 2px 4px rgba(0,0,0,0.08)",
-            "fontFamily": "sans-serif",
-            "marginBottom": "8px",
-        },
-    )
+# 旧ルート互換 / ルートからのリダイレクト先。
+ROOT_REDIRECT = "/chart-opt"
 
 
 def create_root_layout() -> html.Div:
@@ -986,7 +1005,6 @@ def create_root_layout() -> html.Div:
     return html.Div(
         [
             dcc.Location(id="url"),
-            _nav_bar(),
             html.Div(id="page-content"),
         ]
     )

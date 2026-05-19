@@ -26,10 +26,22 @@ from app.frontend.layout import (
     _make_bond_rank_input,
     _default_costume_name,
     PAGES,
+    ROOT_REDIRECT,
     create_layout,
     build_gs_gift_list,
     gs_default_used,
 )
+
+
+@callback(
+    Output("url", "pathname"),
+    Input("url", "pathname"),
+)
+def redirect_root(pathname):
+    """ルート (/) を計算機ページへリダイレクトする。"""
+    if pathname == "/":
+        return ROOT_REDIRECT
+    raise PreventUpdate
 
 
 @callback(

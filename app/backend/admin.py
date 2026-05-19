@@ -14,15 +14,34 @@ from flask import redirect, request, session, url_for
 from app import app
 from app.backend.student import BOND_RANGES
 from app.backend.user_presets import (
+    VALID_PRESENT_TIERS,
     VALID_STATUS_NAMES,
+    admin_add_costume,
     admin_delete_preset,
     admin_delete_priority,
+    admin_get_costume,
+    admin_load_costumes,
+    admin_load_present,
     admin_load_presets,
     admin_load_priorities,
     admin_rebuild_preset,
+    admin_save_present,
     admin_set_preset_approved,
     admin_upsert_priority,
+    load_gifts,
 )
+
+# present.tier の日本語ラベル（管理画面の選択肢表示用）。
+_TIER_LABELS = {
+    "favorite": "好み (中)",
+    "superFavorite": "とても好み (大)",
+    "ultraFavorite": "最も好み (特大)",
+}
+
+# present の対象になり得る贈り物タイプ。all 型・贈り物選択ボックスは
+# tier (好み) を持たないため編集対象外。
+_PRESENT_GIFT_TYPES = ("normal", "high")
+_GIFT_SELECT_BOX_ID = "gift-select-box"
 
 server = app.server
 server.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key-change-me")
@@ -158,6 +177,23 @@ _STYLE = """
   .empty { text-align: center; color: #888; padding: 24px; }
   .footer { text-align: center; color: #999; font-size: 0.8rem;
             margin-top: 28px; }
+  .navlink { margin-left: auto; color: #2980b9; text-decoration: none;
+             font-size: 0.9rem; }
+  .navlink + .logout { margin-left: 14px; }
+  .navlink:hover { text-decoration: underline; }
+  .present-link { color: #2980b9; text-decoration: none; font-size: 0.8rem;
+                  white-space: nowrap; }
+  .present-link:hover { text-decoration: underline; }
+  .gift-thumb { width: 30px; height: 30px; vertical-align: middle;
+                margin-right: 8px; }
+  .gift-name { vertical-align: middle; }
+  .gift-type { color: #888; font-size: 0.75rem; margin-left: 6px; }
+  .picker { background: white; padding: 16px; border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 16px; }
+  .picker select { min-width: 320px; }
+  .badge-present { background: #d4edda; color: #155724; }
+  td.tier-cell { width: 220px; }
+  tr.has-present { background: #fffceb; }
 </style>
 """
 
@@ -190,6 +226,12 @@ def _costume_row(prefix: str, idx: int, costume: dict | None = None) -> str:
         ' <button type="button" class="btn-remove-costume" '
         'onclick="this.parentElement.remove()">✕</button>'
     )
+    cid = costume.get("costume_id") if costume else None
+    if cid:
+        inp += (
+            f' <a class="present-link" href="/admin/presents?costume_id={cid}" '
+            'target="_blank" title="この衣装の好み(present)を編集">好み ↗</a>'
+        )
     return f'<div class="costume-row">{inp}</div>'
 
 
@@ -376,6 +418,7 @@ def _render_admin_page(message: str = "", msg_type: str = "ok") -> str:
     <title>プリセット管理</title>{_STYLE}</head><body>
     <div class="header">
       <h1>プリセット管理</h1>
+      <a href="/admin/presents" class="navlink">好み(present)管理 →</a>
       <a href="/admin/logout" class="logout">ログアウト</a>
     </div>
     {msg_html}
@@ -546,3 +589,215 @@ def admin_priority_delete():
     except Exception as e:
         return _redirect_msg(f"エラー: {e}", "err")
     return _redirect_msg(f"優先度を削除しました（{s}）")
+
+
+# ======================================================================
+# 好み (present) 管理ページ
+# ======================================================================
+
+
+def _present_gifts() -> list[dict]:
+    """present 編集対象の贈り物（normal / high のみ、選択ボックス除く）。"""
+    return [
+        g
+        for g in load_gifts()
+        if g["gift_type"] in _PRESENT_GIFT_TYPES and g["id"] != _GIFT_SELECT_BOX_ID
+    ]
+
+
+def _costume_label(c: dict) -> str:
+    name = c["costume_name"] or "（標準）"
+    star = f" ★{c['present_count']}" if c["present_count"] else ""
+    return f"{name}{star}"
+
+
+def _costume_picker(costumes: list[dict], selected_id: int | None) -> str:
+    """生徒ごとに optgroup でまとめた衣装セレクタ。"""
+    groups: dict[str, list[dict]] = {}
+    for c in costumes:
+        groups.setdefault(c["student_name"], []).append(c)
+    opts = ['<option value="">― 衣装を選択 ―</option>']
+    for student, items in groups.items():
+        opts.append(f'<optgroup label="{escape(student)}">')
+        for c in items:
+            sel = " selected" if c["costume_id"] == selected_id else ""
+            opts.append(
+                f'<option value="{c["costume_id"]}"{sel}>'
+                f"{escape(_costume_label(c))}</option>"
+            )
+        opts.append("</optgroup>")
+    return (
+        '<div class="picker">'
+        '<form method="get" action="/admin/presents">'
+        "衣装: "
+        '<select name="costume_id" onchange="this.form.submit()">'
+        f"{''.join(opts)}</select> "
+        '<noscript><button type="submit" class="btn-save">表示</button></noscript>'
+        "</form>"
+        '<div class="summary" style="margin:8px 0 0">'
+        "★ は登録済みの好み件数。生徒の並びは表示優先度に従う。</div>"
+        '<form method="post" action="/admin/presents/add_costume" '
+        'style="margin-top:12px;border-top:1px solid #eee;padding-top:12px">'
+        "新規 生徒/衣装 を追加: "
+        '<input type="text" name="student_name" placeholder="生徒名" '
+        'required style="width:160px"> '
+        '<input type="text" name="costume_name" placeholder="衣装名" '
+        'required style="width:160px"> '
+        '<button type="submit" class="btn-add" '
+        'style="margin-top:0">追加して編集</button>'
+        '<div class="summary" style="margin:6px 0 0">'
+        "既存の (生徒名, 衣装名) があればそれを再利用します。"
+        "衣装名は空欄不可（標準衣装は「通常」等で登録）。</div>"
+        "</form>"
+        "</div>"
+    )
+
+
+def _tier_select(gift_id: str, current: str) -> str:
+    opts = [f'<option value=""{"" if current else " selected"}>― なし ―</option>']
+    for t in VALID_PRESENT_TIERS:
+        sel = " selected" if current == t else ""
+        opts.append(f'<option value="{t}"{sel}>{escape(_TIER_LABELS[t])}</option>')
+    return f'<select name="g_{escape(gift_id)}">{"".join(opts)}</select>'
+
+
+def _present_editor(costume_id: int) -> str:
+    costume = admin_get_costume(costume_id)
+    if costume is None:
+        return '<div class="msg msg-err">指定された衣装が見つかりません。</div>'
+    present = admin_load_present(costume_id)
+    gifts = _present_gifts()
+    title = escape(costume["student_name"])
+    cname = escape(costume["costume_name"] or "（標準）")
+
+    rows = ""
+    for g in gifts:
+        gid = g["id"]
+        cur = present.get(gid, "")
+        cls = ' class="has-present"' if cur else ""
+        rows += f"""<tr{cls}>
+          <td>
+            <img class="gift-thumb" src="/assets/gift/{escape(gid)}.png"
+                 alt="" onerror="this.style.display='none'">
+            <span class="gift-name">{escape(g["name"])}</span>
+            <span class="gift-type">[{escape(g["gift_type"])}]</span>
+          </td>
+          <td class="tier-cell">{_tier_select(gid, cur)}</td>
+        </tr>"""
+
+    set_count = sum(1 for g in gifts if present.get(g["id"]))
+    return f"""
+    <h2>{title} / {cname} の好み — 設定済み {set_count} 件</h2>
+    <div class="summary">「なし」のままの贈り物は present から削除されます。
+      tier は EXP 計算に影響します（中=favorite / 大=superFavorite /
+      特大=ultraFavorite）。</div>
+    <form method="post" action="/admin/presents/save">
+      <input type="hidden" name="costume_id" value="{costume_id}">
+      <table>
+        <thead><tr>
+          <th>贈り物</th><th class="tier-cell">好み (tier)</th>
+        </tr></thead>
+        <tbody>{rows}</tbody>
+      </table>
+      <button type="button" class="btn-delete"
+              onclick="document.querySelectorAll('table select')
+                       .forEach(function(s){{s.value='';}})">
+        全て「なし」に</button>
+      <button type="submit" class="btn-add">この衣装の好みを保存</button>
+    </form>"""
+
+
+def _render_presents_page(
+    costume_id: int | None, message: str = "", msg_type: str = "ok"
+) -> str:
+    try:
+        costumes = admin_load_costumes()
+    except Exception as e:
+        costumes = []
+        if not message:
+            message, msg_type = f"衣装一覧の取得に失敗しました: {e}", "err"
+
+    msg_html = ""
+    if message:
+        cls = "msg-ok" if msg_type == "ok" else "msg-err"
+        msg_html = f'<div class="msg {cls}">{escape(message)}</div>'
+
+    picker = _costume_picker(costumes, costume_id)
+    if costume_id is None:
+        body = '<div class="empty">編集する衣装を選択してください。</div>'
+    else:
+        try:
+            body = _present_editor(costume_id)
+        except Exception as e:
+            body = f'<div class="msg msg-err">エラー: {escape(str(e))}</div>'
+
+    return f"""<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>好み(present)管理</title>{_STYLE}</head><body>
+    <div class="header">
+      <h1>好み(present)管理</h1>
+      <a href="/admin/presets" class="navlink">← プリセット管理</a>
+      <a href="/admin/logout" class="logout">ログアウト</a>
+    </div>
+    {msg_html}
+    {picker}
+    {body}
+    <div class="footer">present = 衣装ごとの好み贈り物。gift カタログは固定。</div>
+    </body></html>"""
+
+
+def _parse_costume_id(raw: str) -> int | None:
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+@server.route("/admin/presents")
+@_require_login
+def admin_presents():
+    costume_id = _parse_costume_id(request.args.get("costume_id", ""))
+    msg = request.args.get("msg", "")
+    msg_type = request.args.get("type", "ok")
+    return _render_presents_page(costume_id, msg, msg_type)
+
+
+def _redirect_presents(costume_id: int | None, msg: str, msg_type: str = "ok"):
+    cid = f"costume_id={costume_id}&" if costume_id is not None else ""
+    return redirect(f"/admin/presents?{cid}msg={quote(msg)}&type={msg_type}")
+
+
+@server.route("/admin/presents/save", methods=["POST"])
+@_require_login
+def admin_present_save():
+    f = request.form
+    costume_id = _parse_costume_id(f.get("costume_id", ""))
+    if costume_id is None:
+        return _redirect_presents(None, "衣装が指定されていません", "err")
+    mapping: dict[str, str] = {}
+    for g in _present_gifts():
+        tier = f.get(f"g_{g['id']}", "").strip()
+        if tier in VALID_PRESENT_TIERS:
+            mapping[g["id"]] = tier
+    try:
+        admin_save_present(costume_id, mapping)
+    except Exception as e:
+        return _redirect_presents(costume_id, f"エラー: {e}", "err")
+    return _redirect_presents(costume_id, f"好みを保存しました（{len(mapping)} 件）")
+
+
+@server.route("/admin/presents/add_costume", methods=["POST"])
+@_require_login
+def admin_present_add_costume():
+    f = request.form
+    student = f.get("student_name", "").strip()
+    costume = f.get("costume_name", "").strip()
+    if not student or not costume:
+        return _redirect_presents(None, "生徒名と衣装名を入力してください", "err")
+    try:
+        costume_id = admin_add_costume(student, costume)
+    except Exception as e:
+        return _redirect_presents(None, f"エラー: {e}", "err")
+    return _redirect_presents(
+        costume_id, f"「{student} / {costume}」を追加しました。好みを編集できます。"
+    )

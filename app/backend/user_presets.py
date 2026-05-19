@@ -106,10 +106,37 @@ def _ensure_preset_approval() -> None:
             _logger.exception("preset_approval backfill skipped")
 
 
+def _ensure_present_table() -> None:
+    """衣装ごとの好み贈り物テーブル (present) を用意する。
+
+    本番では既存のため CREATE TABLE IF NOT EXISTS は no-op。ローカル
+    開発で costume だけ作られている環境向けに冪等で作成する。
+    """
+    conn = _get_conn()
+    with conn.cursor() as cur:
+        try:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS present (
+                    id         SERIAL PRIMARY KEY,
+                    costume_id INTEGER NOT NULL
+                        REFERENCES costume(id) ON DELETE CASCADE,
+                    gift_id    TEXT NOT NULL,
+                    gift_name  TEXT NOT NULL,
+                    gift_type  TEXT NOT NULL,
+                    tier       TEXT NOT NULL,
+                    UNIQUE (costume_id, gift_id)
+                )
+            """)
+        except Exception:
+            # costume 未作成の環境では作成をスキップ。
+            _logger.exception("present table creation skipped")
+
+
 if _DATABASE_URL:
     try:
         _ensure_table()
         _ensure_preset_approval()
+        _ensure_present_table()
         _logger.info("PostgreSQL backend initialized")
     except Exception:
         _logger.exception("Failed to initialize user_presets table")
@@ -685,3 +712,121 @@ def get_preset_preferred_gift_ids(student_name: str, status_name: str) -> set[st
     except Exception:
         _logger.exception("DB read error")
         return set()
+
+
+# ----------------------------------------------------------------------
+# 管理画面用 (present = 衣装ごとの好み贈り物 の編集)
+# ----------------------------------------------------------------------
+
+# present.tier の選択肢（gift_exp._TIER_TO_EFFECTIVITY のキーと一致）。
+VALID_PRESENT_TIERS = ("favorite", "superFavorite", "ultraFavorite")
+
+
+def admin_load_costumes() -> list[dict]:
+    """全衣装を表示優先度順で返す。
+
+    present は (生徒, ステータス) ではなく costume 単位。bond_bonus を
+    持たない衣装（present のみ／新規挿入した衣装）も含めて列挙する。
+
+    Returns
+    -------
+    list[dict]
+        [{costume_id, student_name, costume_name, present_count}, ...]
+    """
+    conn = _get_conn()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT c.id, c.student_name, c.costume_name, "
+            "COUNT(p.gift_id) AS present_count "
+            "FROM costume c "
+            "LEFT JOIN student_priority sp ON sp.student_name = c.student_name "
+            "LEFT JOIN present p ON p.costume_id = c.id "
+            "GROUP BY c.id, c.student_name, c.costume_name, c.sort_order, "
+            "sp.priority "
+            "ORDER BY COALESCE(sp.priority, 1000000), c.student_name, "
+            "c.sort_order, c.id"
+        )
+        return [
+            {
+                "costume_id": r[0],
+                "student_name": r[1],
+                "costume_name": r[2],
+                "present_count": r[3],
+            }
+            for r in cur.fetchall()
+        ]
+
+
+def admin_add_costume(student_name: str, costume_name: str) -> int:
+    """衣装を新規挿入（既存なら再利用）し、その costume_id を返す。
+
+    present 編集用に、bond_bonus を持たない衣装も作成できる。
+    既存の (生徒名, 衣装名) があればその id をそのまま返す。
+    """
+    conn = _get_conn()
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO costume (student_name, costume_name, sort_order) "
+            "VALUES (%s, %s, 0) "
+            "ON CONFLICT (student_name, costume_name) "
+            "DO UPDATE SET costume_name = EXCLUDED.costume_name "
+            "RETURNING id",
+            (student_name, costume_name),
+        )
+        return cur.fetchone()[0]
+
+
+def admin_load_present(costume_id: int) -> dict[str, str]:
+    """指定衣装の present を {gift_id: tier} で返す。"""
+    conn = _get_conn()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT gift_id, tier FROM present WHERE costume_id = %s",
+            (costume_id,),
+        )
+        return {r[0]: r[1] for r in cur.fetchall()}
+
+
+def admin_get_costume(costume_id: int) -> dict | None:
+    """衣装の (生徒名, 衣装名) を返す。存在しなければ None。"""
+    conn = _get_conn()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT student_name, costume_name FROM costume WHERE id = %s",
+            (costume_id,),
+        )
+        row = cur.fetchone()
+    if not row:
+        return None
+    return {"student_name": row[0], "costume_name": row[1]}
+
+
+def admin_save_present(costume_id: int, mapping: dict[str, str]) -> None:
+    """衣装の present をフォーム内容で総入れ替えする。
+
+    mapping: {gift_id: tier}。tier が VALID_PRESENT_TIERS 外の
+    エントリは無視する。present.gift_name / gift_type は gift カタログ
+    を単一の真実として SELECT で埋める（カタログに無い gift_id は
+    挿入されない）。
+    """
+    conn = _get_conn()
+    conn.autocommit = False
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM present WHERE costume_id = %s", (costume_id,))
+            for gift_id, tier in mapping.items():
+                if tier not in VALID_PRESENT_TIERS:
+                    continue
+                cur.execute(
+                    "INSERT INTO present "
+                    "(costume_id, gift_id, gift_name, gift_type, tier) "
+                    "SELECT %s, g.id, g.name, g.gift_type, %s "
+                    "FROM gift g WHERE g.id = %s",
+                    (costume_id, tier, gift_id),
+                )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.autocommit = True
