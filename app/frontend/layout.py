@@ -4,7 +4,11 @@ from pathlib import Path
 from dash import html, dcc
 
 from app.backend.student import BOND_RANGES
-from app.backend.user_presets import get_all_presets_for_dropdown, load_gifts
+from app.backend.user_presets import (
+    get_all_presets_for_dropdown,
+    gift_image_src,
+    load_gifts,
+)
 
 # PyInstaller バンドル時は _MEIPASS、通常時はプロジェクトルート
 if getattr(sys, "frozen", False):
@@ -710,7 +714,7 @@ def _gs_gift_card(gift: dict, default_use: bool, qty: int = 0) -> html.Div:
     return html.Div(
         [
             html.Img(
-                src=f"/assets/gift/{gid}.png",
+                src=gift_image_src(gift),
                 style={"width": "34px", "height": "26px", "objectFit": "contain"},
             ),
             html.Div(

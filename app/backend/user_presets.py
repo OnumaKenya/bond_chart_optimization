@@ -11,6 +11,7 @@ import os
 import threading
 import time
 from pathlib import Path
+from urllib.parse import quote
 
 _logger = logging.getLogger(__name__)
 
@@ -662,6 +663,15 @@ def load_gifts() -> list[dict]:
     except Exception:
         _logger.exception("DB read error")
         return []
+
+
+def gift_image_src(gift: dict) -> str:
+    """贈り物アイコンの URL。ファイル名は gift.name（日本語可）。
+
+    日本語名を URL に含めるためパーセントエンコードする。画像ファイル
+    (assets/gift/<name>.png) のファイル名は DB の gift.name と一致させる。
+    """
+    return f"/assets/gift/{quote(gift['name'])}.png"
 
 
 def get_preset_present(

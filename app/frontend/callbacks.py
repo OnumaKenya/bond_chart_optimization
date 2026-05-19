@@ -11,6 +11,7 @@ from app.backend.user_presets import (
     register_costume_preset,
     VALID_STATUS_NAMES,
     load_gifts,
+    gift_image_src,
     get_preset_preferred_gift_ids,
     get_preset_present,
     parse_preset_value,
@@ -364,7 +365,7 @@ def _gs_result_table(
             html.Div(
                 [
                     html.Img(
-                        src=f"/assets/gift/{g['id']}.png",
+                        src=gift_image_src(g),
                         title=g["name"],
                         style={
                             "width": "28px",

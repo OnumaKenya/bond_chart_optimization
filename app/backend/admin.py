@@ -28,6 +28,7 @@ from app.backend.user_presets import (
     admin_save_present,
     admin_set_preset_approved,
     admin_upsert_priority,
+    gift_image_src,
     load_gifts,
 )
 
@@ -722,7 +723,7 @@ def _present_editor(costume_id: int) -> str:
         cls = ' class="has-present"' if cur else ""
         rows += f"""<tr{cls}>
           <td>
-            <img class="gift-thumb" src="/assets/gift/{escape(gid)}.png"
+            <img class="gift-thumb" src="{gift_image_src(g)}"
                  alt="" onerror="this.style.display='none'">
             <span class="gift-name">{escape(g["name"])}</span>
             <span class="gift-type">[{escape(g["gift_type"])}]</span>
