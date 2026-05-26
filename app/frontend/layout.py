@@ -17,6 +17,7 @@ else:
     _BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 _MANUAL_MD = (_BASE_DIR / "docs" / "manual.md").read_text(encoding="utf-8")
+_PRIVACY_MD = (_BASE_DIR / "docs" / "privacy.md").read_text(encoding="utf-8")
 
 LABEL_STYLE = {"fontSize": "1rem", "whiteSpace": "nowrap"}
 
@@ -186,7 +187,7 @@ def _contact_span(nowrap: bool = True) -> html.Span:
         style["whiteSpace"] = "nowrap"
     return html.Span(
         [
-            "不具合・要望報告は",
+            "不具合・要望報告は外部サービスの",
             html.A(
                 "フォーム",
                 href="https://forms.gle/yxJYDAY55TPDkMr39",
@@ -205,6 +206,65 @@ def _contact_span(nowrap: bool = True) -> html.Span:
             "まで",
         ],
         style=style,
+    )
+
+
+def _footer() -> html.Div:
+    """全ページ共通フッター。プライバシーポリシーへのリンクを置く。"""
+    return html.Div(
+        [
+            dcc.Link(
+                "プライバシーポリシー",
+                href="/privacy",
+                style={"color": "#4a90d9", "textDecoration": "underline"},
+            ),
+        ],
+        style={
+            "marginTop": "32px",
+            "paddingTop": "12px",
+            "borderTop": "1px solid #ddd",
+            "textAlign": "center",
+            "fontSize": "0.8rem",
+            "color": "#888",
+        },
+    )
+
+
+def create_privacy_layout() -> html.Div:
+    """プライバシーポリシー表示ページ。"""
+    return html.Div(
+        [
+            html.Div(
+                [
+                    dcc.Link(
+                        "← 計算機に戻る",
+                        href="/chart-opt",
+                        style={
+                            "color": "#4a90d9",
+                            "textDecoration": "none",
+                            "fontSize": "0.9rem",
+                        },
+                    ),
+                ],
+                style={"marginBottom": "16px"},
+            ),
+            dcc.Markdown(
+                _PRIVACY_MD,
+                style={
+                    "background": "#fff",
+                    "padding": "24px",
+                    "borderRadius": "8px",
+                    "boxShadow": "0 1px 3px rgba(0,0,0,0.08)",
+                    "lineHeight": "1.7",
+                },
+            ),
+            _footer(),
+        ],
+        style={
+            "maxWidth": "820px",
+            "margin": "24px auto",
+            "padding": "0 20px",
+        },
     )
 
 
@@ -673,6 +733,7 @@ def create_layout() -> html.Div:
             dcc.Store(id="autosave", storage_type="local"),
             dcc.Store(id="favorites", storage_type="local", data=[]),
             dcc.Interval(id="autosave-init", max_intervals=1, interval=200),
+            _footer(),
         ],
         className="page-container",
         style={
@@ -979,6 +1040,7 @@ def create_gift_simulator_layout() -> html.Div:
             dcc.Store(id="gs-loaded-preset"),
             dcc.Store(id="gs-autosave", storage_type="local"),
             dcc.Interval(id="gs-autosave-init", max_intervals=1, interval=300),
+            _footer(),
         ],
         className="page-container",
         style={
@@ -994,10 +1056,15 @@ def create_gift_simulator_layout() -> html.Div:
 # ルートレイアウト（URL ルーティング）
 # ======================================================================
 
-# パス → ページ。ルーティングコールバックと共有する。
+# ページ切り替えリンクに出す主要ページ。
 PAGES = {
     "/chart-opt": ("絆上げ優先度計算機", create_layout),
     "/gift-simulation": ("贈り物配分シミュレータ(β版)", create_gift_simulator_layout),
+}
+
+# 主要ページ以外のページ（フッター等からのみアクセス）。
+EXTRA_PAGES = {
+    "/privacy": ("プライバシーポリシー", create_privacy_layout),
 }
 
 # 旧ルート互換 / ルートからのリダイレクト先。

@@ -27,6 +27,7 @@ from app.frontend.layout import (
     _make_bond_rank_input,
     _default_costume_name,
     PAGES,
+    EXTRA_PAGES,
     ROOT_REDIRECT,
     create_layout,
     build_gs_gift_list,
@@ -51,7 +52,7 @@ def redirect_root(pathname):
 )
 def display_page(pathname):
     """URL に応じてページを差し替える。未知のパスは計算機ページ。"""
-    entry = PAGES.get(pathname)
+    entry = PAGES.get(pathname) or EXTRA_PAGES.get(pathname)
     if entry is not None:
         _, builder = entry
         return builder()
