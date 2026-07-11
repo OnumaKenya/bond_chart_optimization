@@ -900,7 +900,7 @@ def create_gift_simulator_layout() -> html.Div:
         [
             html.Div(
                 [
-                    html.H1("贈り物配分シミュレータ(β版)", style={"margin": "0"}),
+                    html.H1("贈り物配分シミュレータ", style={"margin": "0"}),
                     _page_switch_link("/gift-simulation"),
                 ],
                 style={
@@ -994,6 +994,26 @@ def create_gift_simulator_layout() -> html.Div:
                     "marginBottom": "16px",
                 },
             ),
+            # 衣装ごとの好物（normal 以外を 衣装×リアクション の表で表示）
+            html.Div(
+                [
+                    html.Strong("衣装ごとの好物"),
+                    html.Div(
+                        id="gs-present-display",
+                        children=html.P(
+                            "プリセットを読み込んでください。",
+                            style={"color": "#888", "margin": "8px 0"},
+                        ),
+                        style={"marginTop": "8px"},
+                    ),
+                ],
+                style={
+                    "padding": "12px",
+                    "border": "1px solid #ccc",
+                    "borderRadius": "8px",
+                    "marginBottom": "16px",
+                },
+            ),
             # 贈り物リスト
             html.Div(
                 [
@@ -1059,7 +1079,7 @@ def create_gift_simulator_layout() -> html.Div:
 # ページ切り替えリンクに出す主要ページ。
 PAGES = {
     "/chart-opt": ("絆上げ優先度計算機", create_layout),
-    "/gift-simulation": ("贈り物配分シミュレータ(β版)", create_gift_simulator_layout),
+    "/gift-simulation": ("贈り物配分シミュレータ", create_gift_simulator_layout),
 }
 
 # 主要ページ以外のページ（フッター等からのみアクセス）。

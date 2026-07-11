@@ -15,6 +15,7 @@ from app.backend.user_presets import (
     get_preset_preferred_gift_ids,
     get_preset_present,
     parse_preset_value,
+    VALID_PRESENT_TIERS,
 )
 from app.backend.gift_exp import (
     gift_exp,
@@ -149,17 +150,91 @@ def _gs_costume_rows(
     return rows
 
 
+# present.tier -> リアクションアイコン (assets/reaction/<name>.png)。
+# admin._TIER_ICON と同じ対応。
+_GS_TIER_ICON = {
+    "favorite": "favorite",
+    "superFavorite": "super",
+    "ultraFavorite": "ultra",
+}
+_GS_TIER_LABELS = {
+    "favorite": "中",
+    "superFavorite": "大",
+    "ultraFavorite": "特大",
+}
+
+
+def _gs_present_table(costumes: list[dict], present: dict, gifts: list[dict]):
+    """衣装ごとの好物（normal 以外）を 衣装(縦)×リアクション(横) の表にする。
+
+    present: {衣装名: {gift_id: tier}}。データが無い場合はメッセージを返す。
+    """
+    if not any(present.get(c["costume_name"]) for c in costumes):
+        return html.P(
+            "好物データが登録されていません。",
+            style={"color": "#888", "margin": "8px 0"},
+        )
+    header = html.Tr(
+        [html.Th("衣装", style=_TH)]
+        + [
+            html.Th(
+                html.Img(
+                    src=f"/assets/reaction/{_GS_TIER_ICON[t]}.png",
+                    alt=_GS_TIER_LABELS[t],
+                    title=_GS_TIER_LABELS[t],
+                    style={"height": "24px", "verticalAlign": "middle"},
+                ),
+                style=_TH,
+            )
+            for t in VALID_PRESENT_TIERS
+        ]
+    )
+    rows = []
+    for c in costumes:
+        tier_by_gift = present.get(c["costume_name"], {})
+        cells = []
+        for t in VALID_PRESENT_TIERS:
+            imgs = [
+                html.Img(
+                    src=gift_image_src(g),
+                    title=g["name"],
+                    style={
+                        "width": "34px",
+                        "height": "26px",
+                        "objectFit": "contain",
+                        "padding": "2px",
+                        "borderRadius": "4px",
+                        # 高級は淡い紫、通常は淡い黄色
+                        "background": (
+                            "#ede7f6"
+                            if g["gift_type"] in ("high", "high-all")
+                            else "#fff9c4"
+                        ),
+                    },
+                )
+                for g in gifts
+                if tier_by_gift.get(g["id"]) == t
+            ]
+            cells.append(html.Td(imgs if imgs else "－", style=_TD))
+        rows.append(html.Tr([html.Td(c["costume_name"], style=_TD_LABEL)] + cells))
+    return html.Table(
+        [html.Thead(header), html.Tbody(rows)],
+        style={"borderCollapse": "collapse"},
+    )
+
+
 def _gs_build_view(preset_value, ranks=None, qty=None, use=None, remain=None):
-    """プリセットから 衣装表示 / フィードバック / loaded-store /
+    """プリセットから 衣装表示 / 好物表 / フィードバック / loaded-store /
     贈り物リスト を構築する。ranks/qty/use/remain は保存値の上書き（復元用）。
 
-    Returns (costume_children, feedback, store_data, gift_list_children)
-    または失敗時 (None, error_span, None, None)。
+    Returns (costume_children, present_children, feedback, store_data,
+    gift_list_children) または失敗時 (None, None, error_span, None, None)。
     """
     result = get_preset_data(preset_value)
     parsed = parse_preset_value(preset_value)
     if not result or not parsed:
         return (
+            None,
             None,
             html.Span("プリセットが見つかりません。", style={"color": "red"}),
             None,
@@ -169,17 +244,21 @@ def _gs_build_view(preset_value, ranks=None, qty=None, use=None, remain=None):
     student_name, status_name = parsed
     preferred = get_preset_preferred_gift_ids(student_name, status_name)
 
+    gifts = load_gifts()
     gift_list_children = build_gs_gift_list(
-        load_gifts(),
+        gifts,
         lambda g: gs_default_used(g, preferred),
         qty_by_gift=qty,
         use_by_gift=use,
     )
+    present = get_preset_present(student_name, status_name)
+    present_children = _gs_present_table(costumes, present, gifts)
     feedback = html.Span(
         f"「{display_name}」を読み込みました。", style={"color": "#27ae60"}
     )
     return (
         _gs_costume_rows(costumes, rank_by_index=ranks, remain_by_index=remain),
+        present_children,
         feedback,
         {
             "student_name": student_name,
@@ -192,6 +271,7 @@ def _gs_build_view(preset_value, ranks=None, qty=None, use=None, remain=None):
 
 @callback(
     Output("gs-costume-display", "children"),
+    Output("gs-present-display", "children"),
     Output("gs-load-feedback", "children"),
     Output("gs-loaded-preset", "data"),
     Output("gs-gift-list", "children"),
@@ -203,14 +283,17 @@ def gs_load_preset(n_clicks, preset_value):
     if not preset_value:
         return (
             no_update,
+            no_update,
             html.Span("プリセットを選択してください。", style={"color": "red"}),
             no_update,
             no_update,
         )
-    costume_children, feedback, store, gift_list = _gs_build_view(preset_value)
+    costume_children, present_children, feedback, store, gift_list = _gs_build_view(
+        preset_value
+    )
     if store is None:
-        return (no_update, feedback, no_update, no_update)
-    return (costume_children, feedback, store, gift_list)
+        return (no_update, no_update, feedback, no_update, no_update)
+    return (costume_children, present_children, feedback, store, gift_list)
 
 
 # ----------------------------------------------------------------------
@@ -273,6 +356,7 @@ def gs_save_autosave(
 @callback(
     Output("gs-preset-dropdown", "value"),
     Output("gs-costume-display", "children", allow_duplicate=True),
+    Output("gs-present-display", "children", allow_duplicate=True),
     Output("gs-load-feedback", "children", allow_duplicate=True),
     Output("gs-loaded-preset", "data", allow_duplicate=True),
     Output("gs-gift-list", "children", allow_duplicate=True),
@@ -298,14 +382,21 @@ def gs_restore_autosave(_n, data):
             qty_by_gift=qty,
             use_by_gift=use,
         )
-        return (None, no_update, no_update, no_update, gift_list)
+        return (None, no_update, no_update, no_update, no_update, gift_list)
 
-    costume_children, feedback, store, gift_list = _gs_build_view(
+    costume_children, present_children, feedback, store, gift_list = _gs_build_view(
         preset_value, ranks=ranks, qty=qty, use=use, remain=remain
     )
     if store is None:
         raise PreventUpdate
-    return (preset_value, costume_children, feedback, store, gift_list)
+    return (
+        preset_value,
+        costume_children,
+        present_children,
+        feedback,
+        store,
+        gift_list,
+    )
 
 
 def _rank_bg(rank: int) -> str:
