@@ -600,6 +600,31 @@ def create_layout() -> html.Div:
                                     "marginBottom": "16px",
                                 },
                             ),
+                            # 衣装ごとの好物（normal 以外を 衣装×リアクション の表で表示）
+                            html.Div(
+                                [
+                                    html.Strong(
+                                        "衣装ごとの好物",
+                                        style={
+                                            "marginBottom": "8px",
+                                            "display": "block",
+                                        },
+                                    ),
+                                    html.Div(
+                                        id="present-display",
+                                        children=html.P(
+                                            "プリセットを読み込むと表示されます。",
+                                            style={"color": "#888", "margin": "8px 0"},
+                                        ),
+                                    ),
+                                ],
+                                style={
+                                    "padding": "12px",
+                                    "border": "1px solid #ccc",
+                                    "borderRadius": "8px",
+                                    "marginBottom": "16px",
+                                },
+                            ),
                             # 高度な設定（折りたたみ）
                             html.Details(
                                 [

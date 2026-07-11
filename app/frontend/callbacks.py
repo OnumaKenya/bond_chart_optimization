@@ -12,7 +12,6 @@ from app.backend.user_presets import (
     VALID_STATUS_NAMES,
     load_gifts,
     gift_image_src,
-    get_preset_preferred_gift_ids,
     get_preset_present,
     parse_preset_value,
     VALID_PRESENT_TIERS,
@@ -223,6 +222,17 @@ def _gs_present_table(costumes: list[dict], present: dict, gifts: list[dict]):
     )
 
 
+def _preset_present_children(preset_value, costumes: list[dict]):
+    """プリセット値から好物表を構築する（両ページ共通の入口）。"""
+    parsed = parse_preset_value(preset_value)
+    if not parsed:
+        return html.P(
+            "好物データが登録されていません。",
+            style={"color": "#888", "margin": "8px 0"},
+        )
+    return _gs_present_table(costumes, get_preset_present(*parsed), load_gifts())
+
+
 def _gs_build_view(preset_value, ranks=None, qty=None, use=None, remain=None):
     """プリセットから 衣装表示 / 好物表 / フィードバック / loaded-store /
     贈り物リスト を構築する。ranks/qty/use/remain は保存値の上書き（復元用）。
@@ -242,7 +252,8 @@ def _gs_build_view(preset_value, ranks=None, qty=None, use=None, remain=None):
         )
     display_name, costumes = result
     student_name, status_name = parsed
-    preferred = get_preset_preferred_gift_ids(student_name, status_name)
+    present = get_preset_present(student_name, status_name)
+    preferred = {gid for tiers in present.values() for gid in tiers}
 
     gifts = load_gifts()
     gift_list_children = build_gs_gift_list(
@@ -251,7 +262,6 @@ def _gs_build_view(preset_value, ranks=None, qty=None, use=None, remain=None):
         qty_by_gift=qty,
         use_by_gift=use,
     )
-    present = get_preset_present(student_name, status_name)
     present_children = _gs_present_table(costumes, present, gifts)
     feedback = html.Span(
         f"「{display_name}」を読み込みました。", style={"color": "#27ae60"}
@@ -601,7 +611,7 @@ def gs_calculate(
     student = loaded["student_name"]
     status_name = loaded["status_name"]
     present = get_preset_present(student, status_name)  # 衣装名->{gift:tier}
-    preferred = get_preset_preferred_gift_ids(student, status_name)
+    preferred = {gid for tiers in present.values() for gid in tiers}
     ncol = len(costumes)
 
     # 使用ON贈り物を「個別」と「その他(集約)」に振り分ける。
@@ -818,6 +828,7 @@ def _make_priority_cards(priority_data):
     Output("bond-rank-container", "children"),
     Output("costume-priority-order", "data"),
     Output("chart-result", "children", allow_duplicate=True),
+    Output("present-display", "children"),
     Input("add-student-btn", "n_clicks"),
     Input({"type": "remove-student", "index": ALL}, "n_clicks"),
     Input("load-preset-btn", "n_clicks"),
@@ -875,6 +886,7 @@ def update_students(
             rank_children,
             priority_data,
             no_update,
+            no_update,
         )
 
     if isinstance(trigger, dict) and trigger.get("type") == "remove-student":
@@ -909,6 +921,7 @@ def update_students(
             next_idx,
             rank_children,
             priority_data,
+            no_update,
             no_update,
         )
 
@@ -956,6 +969,7 @@ def update_students(
             new_rank_children,
             priority_data,
             msg,
+            _preset_present_children(preset_name, students),
         )
 
     raise PreventUpdate
@@ -1075,6 +1089,7 @@ def save_autosave(
     Output("costume-priority-order", "data", allow_duplicate=True),
     Output("bond50-penalty", "value", allow_duplicate=True),
     Output("preset-dropdown", "value"),
+    Output("present-display", "children", allow_duplicate=True),
     Input("autosave-init", "n_intervals"),
     State("autosave", "data"),
     prevent_initial_call=True,
@@ -1121,6 +1136,7 @@ def restore_autosave(_n, data):
                 priority,
                 penalty if penalty is not None else 0,
                 preset_value,
+                _preset_present_children(preset_value, students),
             )
 
     # プリセット未選択: デフォルト状態（衣装1つ）

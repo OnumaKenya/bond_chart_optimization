@@ -649,17 +649,30 @@ def admin_delete_priority(student: str) -> None:
 # ======================================================================
 
 
+# 贈り物カタログはほぼ不変のため短時間キャッシュし、ページ表示・
+# プリセット読み込みのたびに DB へ往復しないようにする。
+_gifts_cache: list[dict] | None = None
+_gifts_cache_at = 0.0
+_GIFTS_CACHE_TTL = 300.0  # 秒。DB 直編集の反映はこの時間まで遅延し得る。
+
+
 def load_gifts() -> list[dict]:
     """全贈り物を定義順で返す。[{id, name, gift_type}, ...]"""
+    global _gifts_cache, _gifts_cache_at
     if not _DATABASE_URL:
         return []
+    now = time.time()
+    if _gifts_cache is not None and now - _gifts_cache_at < _GIFTS_CACHE_TTL:
+        return _gifts_cache
     try:
         conn = _get_conn()
         with conn.cursor() as cur:
             cur.execute("SELECT id, name, gift_type FROM gift ORDER BY sort_order")
-            return [
+            gifts = [
                 {"id": r[0], "name": r[1], "gift_type": r[2]} for r in cur.fetchall()
             ]
+        _gifts_cache, _gifts_cache_at = gifts, now
+        return gifts
     except Exception:
         _logger.exception("DB read error")
         return []
@@ -699,29 +712,6 @@ def get_preset_present(
     except Exception:
         _logger.exception("DB read error")
         return {}
-
-
-def get_preset_preferred_gift_ids(student_name: str, status_name: str) -> set[str]:
-    """(生徒名, ステータス名) プリセットの全衣装で、好み
-    (favorite/superFavorite/ultraFavorite いずれか) に入る gift_id 集合。
-    """
-    if not _DATABASE_URL:
-        return set()
-    try:
-        conn = _get_conn()
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT DISTINCT p.gift_id "
-                "FROM present p "
-                "JOIN costume c ON c.id = p.costume_id "
-                "JOIN bond_bonus bb ON bb.costume_id = c.id "
-                "WHERE c.student_name = %s AND bb.status_name = %s",
-                (student_name, status_name),
-            )
-            return {r[0] for r in cur.fetchall()}
-    except Exception:
-        _logger.exception("DB read error")
-        return set()
 
 
 # ----------------------------------------------------------------------
