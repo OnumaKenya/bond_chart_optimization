@@ -317,11 +317,28 @@ def register_costume_preset(
         )
 
 
+# DB接続の有無（UI側でフォールバック時の挙動を切り替える用）。
+HAS_DB = bool(_DATABASE_URL)
+
+
 def _preset_label(student_name: str, status_name: str) -> str:
     """表示名。ステータスが既定の「攻撃」なら生徒名のみ、それ以外は括弧付き。"""
     if status_name == "攻撃":
         return student_name
     return f"{student_name}({status_name})"
+
+
+def make_preset_value(student_name: str, status_name: str) -> str:
+    """(生徒名, ステータス名) をドロップダウン値に結合する。"""
+    return f"{student_name}{_PRESET_VALUE_SEP}{status_name}"
+
+
+def preset_label_for_value(dropdown_value: str) -> str:
+    """結合値の表示名を返す。分解できない値はそのまま返す。"""
+    parsed = parse_preset_value(dropdown_value)
+    if not parsed:
+        return dropdown_value
+    return _preset_label(*parsed)
 
 
 def parse_preset_value(dropdown_value: str) -> tuple[str, str] | None:
@@ -409,6 +426,79 @@ def get_all_presets_for_dropdown() -> list[dict]:
                 "value": f"{student_name}{_PRESET_VALUE_SEP}{status_name}",
                 "search": _search_text(base_label),
             }
+        )
+    return options
+
+
+def get_student_options() -> list[dict]:
+    """生徒選択ドロップダウン用のオプションを返す。
+
+    値は生徒名。表示は優先度 (student_priority) 順 → 生徒名順。
+    DB未接続時は旧形式（キー単位）のオプションを返す。
+    """
+    if not _DATABASE_URL:
+        return get_all_presets_for_dropdown()
+    try:
+        conn = _get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT DISTINCT c.student_name, COALESCE(sp.priority, 1000000) "
+                "FROM costume c "
+                "JOIN bond_bonus bb ON bb.costume_id = c.id "
+                "LEFT JOIN student_priority sp ON sp.student_name = c.student_name "
+                "ORDER BY COALESCE(sp.priority, 1000000), c.student_name"
+            )
+            rows = cur.fetchall()
+    except Exception:
+        _logger.exception("DB read error")
+        return []
+    return [
+        {"label": r[0], "value": r[0], "search": _search_text(r[0])} for r in rows
+    ]
+
+
+def get_status_options_for(student_name: str) -> list[dict]:
+    """指定生徒が持つステータスの選択肢を返す。
+
+    表示順は VALID_STATUS_NAMES。未承認プリセットには [未承認] を付ける。
+    """
+    if not _DATABASE_URL or not student_name:
+        return []
+    try:
+        conn = _get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT DISTINCT bb.status_name FROM costume c "
+                "JOIN bond_bonus bb ON bb.costume_id = c.id "
+                "WHERE c.student_name = %s",
+                (student_name,),
+            )
+            statuses = {r[0] for r in cur.fetchall()}
+            cur.execute(
+                "SELECT status_name, approved FROM preset_approval "
+                "WHERE student_name = %s",
+                (student_name,),
+            )
+            approval = {r[0]: r[1] for r in cur.fetchall()}
+    except Exception:
+        _logger.exception("DB read error")
+        return []
+    options = []
+    for status in VALID_STATUS_NAMES:
+        if status not in statuses:
+            continue
+        label = status if approval.get(status, True) else f"{status} [未承認]"
+        options.append({"label": label, "value": status})
+    return options
+
+
+def get_favorite_options(favorites: list[str]) -> list[dict]:
+    """お気に入り（結合値）をドロップダウンの先頭に出すオプションを返す。"""
+    options = []
+    for value in favorites:
+        label = preset_label_for_value(value)
+        options.append(
+            {"label": f"★ {label}", "value": value, "search": _search_text(label)}
         )
     return options
 

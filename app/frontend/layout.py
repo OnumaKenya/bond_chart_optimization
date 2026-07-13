@@ -5,7 +5,7 @@ from dash import html, dcc
 
 from app.backend.student import BOND_RANGES
 from app.backend.user_presets import (
-    get_all_presets_for_dropdown,
+    get_student_options,
     gift_image_src,
     load_gifts,
 )
@@ -395,8 +395,8 @@ def create_layout() -> html.Div:
                                             html.Div(
                                                 dcc.Dropdown(
                                                     id="preset-dropdown",
-                                                    options=get_all_presets_for_dropdown(),
-                                                    placeholder="選択...",
+                                                    options=get_student_options(),
+                                                    placeholder="生徒を選択...",
                                                 ),
                                                 style={"flex": "1", "minWidth": "0"},
                                             ),
@@ -422,6 +422,19 @@ def create_layout() -> html.Div:
                                             "gap": "6px",
                                             "alignItems": "stretch",
                                             "marginTop": "6px",
+                                        },
+                                    ),
+                                    dcc.RadioItems(
+                                        id="preset-status-radio",
+                                        options=[],
+                                        inline=True,
+                                        style={
+                                            "marginTop": "6px",
+                                            "fontSize": "0.85rem",
+                                        },
+                                        labelStyle={
+                                            "marginRight": "10px",
+                                            "cursor": "pointer",
                                         },
                                     ),
                                     html.Button(
@@ -966,10 +979,17 @@ def create_gift_simulator_layout() -> html.Div:
                     html.Div(
                         dcc.Dropdown(
                             id="gs-preset-dropdown",
-                            options=get_all_presets_for_dropdown(),
-                            placeholder="選択...",
+                            options=get_student_options(),
+                            placeholder="生徒を選択...",
                         ),
                         style={"marginTop": "6px"},
+                    ),
+                    dcc.RadioItems(
+                        id="gs-status-radio",
+                        options=[],
+                        inline=True,
+                        style={"marginTop": "6px", "fontSize": "0.85rem"},
+                        labelStyle={"marginRight": "10px", "cursor": "pointer"},
                     ),
                     html.Button(
                         "読み込み",

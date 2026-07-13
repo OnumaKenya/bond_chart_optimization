@@ -5,8 +5,13 @@ from dash.exceptions import PreventUpdate
 
 from app.backend.student import BOND_RANGES
 from app.backend.user_presets import (
+    HAS_DB,
     get_all_presets_for_dropdown,
+    get_favorite_options,
     get_preset_data,
+    get_status_options_for,
+    get_student_options,
+    make_preset_value,
     preset_exists,
     register_costume_preset,
     VALID_STATUS_NAMES,
@@ -57,6 +62,80 @@ def display_page(pathname):
         _, builder = entry
         return builder()
     return create_layout()
+
+
+# ----------------------------------------------------------------------
+# プリセット選択（生徒ドロップダウン + ステータスラジオ）共通ヘルパー
+# ----------------------------------------------------------------------
+
+
+def _dropdown_student(dropdown_value):
+    """ドロップダウン値から生徒名を取り出す。
+
+    値は通常は生徒名のみだが、お気に入り経由では結合値
+    (生徒名+ステータス名) が入る。
+    """
+    parsed = parse_preset_value(dropdown_value)
+    return parsed[0] if parsed else dropdown_value
+
+
+def _combined_preset_value(dropdown_value, status_value):
+    """生徒選択とステータス選択からプリセット値（結合値）を作る。
+
+    ステータス未選択時（DB未接続の旧形式キーなど）はドロップダウン値を
+    そのまま返す。
+    """
+    if not dropdown_value:
+        return None
+    if status_value:
+        return make_preset_value(_dropdown_student(dropdown_value), status_value)
+    return dropdown_value
+
+
+def _status_options_for_selection(dropdown_value, saved_value):
+    """選択された生徒のステータス選択肢と初期選択を返す。
+
+    初期選択の優先順: 結合値に含まれるステータス（お気に入り経由）
+    → autosave に保存されたステータス（同一生徒の場合）→ 攻撃 → 先頭。
+    """
+    if not dropdown_value:
+        return [], None
+    parsed = parse_preset_value(dropdown_value)
+    student = parsed[0] if parsed else dropdown_value
+    options = get_status_options_for(student)
+    if not options:
+        return [], None
+    valid = [o["value"] for o in options]
+    if parsed and parsed[1] in valid:
+        return options, parsed[1]
+    saved = parse_preset_value(saved_value) if saved_value else None
+    if saved and saved[0] == student and saved[1] in valid:
+        return options, saved[1]
+    if "攻撃" in valid:
+        return options, "攻撃"
+    return options, valid[0]
+
+
+@callback(
+    Output("preset-status-radio", "options"),
+    Output("preset-status-radio", "value"),
+    Input("preset-dropdown", "value"),
+    State("autosave", "data"),
+)
+def update_status_radio(dropdown_value, autosave_data):
+    saved = (autosave_data or {}).get("preset_value")
+    return _status_options_for_selection(dropdown_value, saved)
+
+
+@callback(
+    Output("gs-status-radio", "options"),
+    Output("gs-status-radio", "value"),
+    Input("gs-preset-dropdown", "value"),
+    State("gs-autosave", "data"),
+)
+def gs_update_status_radio(dropdown_value, autosave_data):
+    saved = (autosave_data or {}).get("preset_value")
+    return _status_options_for_selection(dropdown_value, saved)
 
 
 # ----------------------------------------------------------------------
@@ -287,9 +366,11 @@ def _gs_build_view(preset_value, ranks=None, qty=None, use=None, remain=None):
     Output("gs-gift-list", "children"),
     Input("gs-load-preset-btn", "n_clicks"),
     State("gs-preset-dropdown", "value"),
+    State("gs-status-radio", "value"),
     prevent_initial_call=True,
 )
-def gs_load_preset(n_clicks, preset_value):
+def gs_load_preset(n_clicks, dropdown_value, status_value):
+    preset_value = _combined_preset_value(dropdown_value, status_value)
     if not preset_value:
         return (
             no_update,
@@ -314,6 +395,7 @@ def gs_load_preset(n_clicks, preset_value):
 @callback(
     Output("gs-autosave", "data"),
     Input("gs-preset-dropdown", "value"),
+    Input("gs-status-radio", "value"),
     Input({"type": "gs-bond-rank", "index": ALL}, "value"),
     Input({"type": "gs-bond-remain", "index": ALL}, "value"),
     Input({"type": "gs-gift-qty", "gift": ALL}, "value"),
@@ -325,7 +407,8 @@ def gs_load_preset(n_clicks, preset_value):
     prevent_initial_call=True,
 )
 def gs_save_autosave(
-    preset_value,
+    dropdown_value,
+    status_value,
     rank_values,
     remain_values,
     qty_values,
@@ -355,7 +438,7 @@ def gs_save_autosave(
         uid["gift"]: bool(uv and "use" in uv) for uv, uid in zip(use_values, use_ids)
     }
     return {
-        "preset_value": preset_value,
+        "preset_value": _combined_preset_value(dropdown_value, status_value),
         "ranks": ranks,
         "remain": remain,
         "qty": qty,
@@ -400,7 +483,7 @@ def gs_restore_autosave(_n, data):
     if store is None:
         raise PreventUpdate
     return (
-        preset_value,
+        _dropdown_student(preset_value),
         costume_children,
         present_children,
         feedback,
@@ -836,6 +919,7 @@ def _make_priority_cards(priority_data):
     State("next-student-index", "data"),
     State("students-container", "children"),
     State("preset-dropdown", "value"),
+    State("preset-status-radio", "value"),
     State({"type": "bond-rank", "index": ALL}, "value"),
     State({"type": "bond-rank", "index": ALL}, "id"),
     State({"type": "costume", "index": ALL}, "value"),
@@ -850,7 +934,8 @@ def update_students(
     indices,
     next_idx,
     children,
-    preset_name,
+    preset_dropdown_value,
+    preset_status_value,
     rank_values,
     rank_ids,
     costume_values,
@@ -926,6 +1011,9 @@ def update_students(
         )
 
     if trigger == "load-preset-btn":
+        preset_name = _combined_preset_value(
+            preset_dropdown_value, preset_status_value
+        )
         if not preset_name:
             raise PreventUpdate
         result = get_preset_data(preset_name)
@@ -1049,6 +1137,7 @@ def render_and_reorder_priority(
     Input("costume-priority-order", "data"),
     Input("bond50-penalty", "value"),
     Input("preset-dropdown", "value"),
+    Input("preset-status-radio", "value"),
     State("student-indices", "data"),
     State("next-student-index", "data"),
     State({"type": "costume", "index": ALL}, "id"),
@@ -1060,7 +1149,8 @@ def save_autosave(
     rank_values,
     priority_data,
     penalty,
-    preset_value,
+    dropdown_value,
+    status_value,
     indices,
     next_index,
     costume_ids,
@@ -1077,7 +1167,7 @@ def save_autosave(
         "ranks": ranks,
         "priority": priority_data,
         "penalty": penalty,
-        "preset_value": preset_value,
+        "preset_value": _combined_preset_value(dropdown_value, status_value),
     }
 
 
@@ -1135,7 +1225,7 @@ def restore_autosave(_n, data):
                 rank_children,
                 priority,
                 penalty if penalty is not None else 0,
-                preset_value,
+                _dropdown_student(preset_value),
                 _preset_present_children(preset_value, students),
             )
 
@@ -1148,11 +1238,13 @@ def restore_autosave(_n, data):
     Output("fav-toggle-btn", "children"),
     Input("fav-toggle-btn", "n_clicks"),
     Input("preset-dropdown", "value"),
+    Input("preset-status-radio", "value"),
     State("favorites", "data"),
     prevent_initial_call=False,
 )
-def toggle_favorite(n_clicks, preset_value, favorites):
+def toggle_favorite(n_clicks, dropdown_value, status_value, favorites):
     favorites = list(favorites or [])
+    preset_value = _combined_preset_value(dropdown_value, status_value)
     trigger = ctx.triggered_id
     if trigger == "fav-toggle-btn":
         if not preset_value:
@@ -1171,7 +1263,12 @@ def toggle_favorite(n_clicks, preset_value, favorites):
     Input("submit-preset-status", "data"),
 )
 def render_preset_options(favorites, _submit_status):
-    return _sort_options_with_favorites(get_all_presets_for_dropdown(), favorites or [])
+    if not HAS_DB:
+        # JSON フォールバック (旧形式キー)
+        return _sort_options_with_favorites(
+            get_all_presets_for_dropdown(), favorites or []
+        )
+    return get_favorite_options(favorites or []) + get_student_options()
 
 
 @callback(
