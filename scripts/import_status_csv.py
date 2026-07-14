@@ -54,9 +54,7 @@ def _load_db_state(cur):
     approvals: {(student, status): bool}
     """
     cur.execute("SELECT id, student_name, costume_name, sort_order FROM costume")
-    costumes = {
-        (r[1], r[2]): {"id": r[0], "sort_order": r[3]} for r in cur.fetchall()
-    }
+    costumes = {(r[1], r[2]): {"id": r[0], "sort_order": r[3]} for r in cur.fetchall()}
     cur.execute(
         "SELECT c.student_name, c.costume_name, bb.status_name, bb.bond_bonuses "
         "FROM bond_bonus bb JOIN costume c ON c.id = bb.costume_id"
@@ -182,7 +180,9 @@ def _print_plan(result, plan):
     for student, costume, status, old, new in plan["changed_bonuses"]:
         print(f"    ! {student} / {costume} ({status}): DB {old} -> CSV {new}")
     if plan["kept_bonuses"]:
-        print(f"◆ 既存と異なるがDB値を保持 (--keep-existing): {len(plan['kept_bonuses'])}")
+        print(
+            f"◆ 既存と異なるがDB値を保持 (--keep-existing): {len(plan['kept_bonuses'])}"
+        )
         for student, costume, status, old, new in plan["kept_bonuses"]:
             print(f"    = {student} / {costume} ({status}): DB {old} (CSV {new})")
     print(f"◆ 承認済みに変更: {len(plan['approvals'])}")
@@ -268,8 +268,10 @@ def main():
         return 1
 
     result = parse_status_csv(args.csv_path)
-    print(f"CSV: {len(result.presets)} プリセット "
-          f"({len({p['student_name'] for p in result.presets})} 生徒)\n")
+    print(
+        f"CSV: {len(result.presets)} プリセット "
+        f"({len({p['student_name'] for p in result.presets})} 生徒)\n"
+    )
 
     import psycopg2
 

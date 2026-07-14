@@ -452,9 +452,7 @@ def get_student_options() -> list[dict]:
     except Exception:
         _logger.exception("DB read error")
         return []
-    return [
-        {"label": r[0], "value": r[0], "search": _search_text(r[0])} for r in rows
-    ]
+    return [{"label": r[0], "value": r[0], "search": _search_text(r[0])} for r in rows]
 
 
 def get_status_options_for(student_name: str) -> list[dict]:

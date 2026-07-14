@@ -174,9 +174,7 @@ class TestParseStatusCsv:
 
     def test_real_csv(self):
         """リポジトリ内の実CSVが読めることの回帰テスト。"""
-        path = (
-            "data/生徒ステータスまとめ (仮) 公開用 - ステータス .csv"
-        )
+        path = "data/生徒ステータスまとめ (仮) 公開用 - ステータス .csv"
         try:
             result = parse_status_csv(path)
         except FileNotFoundError:
@@ -188,7 +186,5 @@ class TestParseStatusCsv:
             for p in result.presets
             if p["student_name"] == "ワカモ" and p["status_name"] == "攻撃"
         )
-        normal = next(
-            c for c in wakamo["costumes"] if c["costume_name"] == "通常"
-        )
+        normal = next(c for c in wakamo["costumes"] if c["costume_name"] == "通常")
         assert normal["bond_bonuses"] == [3, 5, 7, 9, 2, 3, 6]

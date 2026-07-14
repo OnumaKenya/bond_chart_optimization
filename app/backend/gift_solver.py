@@ -37,6 +37,47 @@ def _level_exp(rank: int) -> int:
     return BOND_EXP_PER_LEVEL[rank - 2]
 
 
+def _rankup_costs(current_rank: int, remaining_exp) -> dict[int, int]:
+    """current_rank から 50 までの各ランクアップ必要 EXP。
+
+    最初の (current_rank -> current_rank+1) のみ remaining_exp（次の絆上昇
+    までの残り経験値）で上書きできる。None・0以下は満額。[1, 満額] にクランプ。
+    """
+    cost = {}
+    for r in range(current_rank + 1, _MAX_RANK + 1):
+        base = _level_exp(r)
+        if (
+            r == current_rank + 1
+            and remaining_exp is not None
+            and int(remaining_exp) > 0
+        ):
+            base = max(1, min(int(remaining_exp), base))
+        cost[r] = base
+    return cost
+
+
+def exp_to_reach_rank(current_rank: int, target_rank: int, remaining_exp=None) -> int:
+    """current_rank から target_rank に上げるのに必要な EXP 合計。
+
+    target_rank <= current_rank なら 0。remaining_exp の扱いは
+    solve_gift_distribution と同じ（最初のランクアップのみ上書き）。
+    """
+    if target_rank <= current_rank:
+        return 0
+    cost = _rankup_costs(current_rank, remaining_exp)
+    return sum(
+        cost[r] for r in range(current_rank + 1, min(target_rank, _MAX_RANK) + 1)
+    )
+
+
+def bonus_gain(bond_bonuses: list[int], from_rank: int, to_rank: int) -> int:
+    """from_rank から to_rank へのランクアップで得られる絆ボーナス合計。"""
+    return sum(
+        _range_bonus(bond_bonuses, r)
+        for r in range(from_rank + 1, min(to_rank, _MAX_RANK) + 1)
+    )
+
+
 def solve_gift_distribution(
     current_ranks: list[int],
     bond_bonuses: list[list[int]],
@@ -118,12 +159,7 @@ def solve_gift_distribution(
             if remaining_exp is not None and c < len(remaining_exp)
             else None
         )
-        cost = {}
-        for r in range(r0 + 1, _MAX_RANK + 1):
-            base = _level_exp(r)
-            if r == r0 + 1 and rem is not None and int(rem) > 0:
-                base = max(1, min(int(rem), base))
-            cost[r] = base
+        cost = _rankup_costs(r0, rem)
         # 消費EXP <= 獲得EXP
         consumed = quicksum(cost[r] * delta[c, r] for r in range(r0 + 1, _MAX_RANK + 1))
         gained = quicksum(value[g][c] * x[g, c] for g in range(m))
@@ -170,6 +206,161 @@ def solve_gift_distribution(
     return {
         "allocation": allocation,
         "final_ranks": final_ranks,
+        "total_gain": total_gain,
+        "status": status,
+    }
+
+
+def solve_required_boxes(
+    current_ranks: list[int],
+    bond_bonuses: list[list[int]],
+    gift_qty: list[int],
+    value: list[list[int]],
+    box_values: list[int],
+    target_ranks: list[int | None] | None = None,
+    target_gain: int | None = None,
+    time_limit: float = DEFAULT_TIME_LIMIT,
+    remaining_exp: list[int | None] | None = None,
+) -> dict:
+    """目標達成に不足する贈り物選択ボックス数の最小値を求める。
+
+    所持贈り物（gift_qty / value、solve_gift_distribution と同形式）を
+    自由に配分してよい前提で、目標の達成に追加で必要な
+    贈り物選択ボックスの総数を最小化する。同点時は所持贈り物の
+    使用数が最少の解を選ぶ（無駄な配分を避ける）。
+
+    目標は次のいずれか（両方指定した場合は両方を課す）:
+      - target_ranks : 衣装ごとの目標絆ランク（None の衣装は対象外）
+      - target_gain  : 絆ボーナス上昇量の合計の下限
+
+    Parameters
+    ----------
+    box_values : list[int]
+        衣装ごとの ボックス1個あたり獲得EXP（gift_select_box_exp の値）。
+        所持している選択ボックスは gift_qty / value 側に含めてよい
+        （その場合ここで数えるのは「追加で必要な」個数）。
+
+    Returns
+    -------
+    dict
+        {
+          "boxes": list[int]             # 衣装ごとの追加ボックス数
+          "allocation": list[list[int]]  # 所持贈り物の配分 allocation[g][c]
+          "final_ranks": list[int]
+          "total_boxes": int
+          "total_gain": int
+          "status": str                  # "optimal" / "timelimit" / "infeasible" 等
+        }
+    """
+    from pyscipopt import Model, quicksum
+
+    n = len(current_ranks)
+    m = len(gift_qty)
+    if target_ranks is None:
+        target_ranks = [None] * n
+    has_rank_target = any(
+        t is not None and t > current_ranks[c] for c, t in enumerate(target_ranks)
+    )
+    if not has_rank_target and (target_gain is None or target_gain <= 0):
+        return {
+            "boxes": [0] * n,
+            "allocation": [[0] * n for _ in range(m)],
+            "final_ranks": list(current_ranks),
+            "total_boxes": 0,
+            "total_gain": 0,
+            "status": "optimal",
+        }
+
+    model = Model("required_boxes")
+    model.hideOutput()
+    model.setParam("limits/time", time_limit)
+
+    # x[g][c]: 所持贈り物の配分
+    x = {}
+    for g in range(m):
+        ub = max(0, int(gift_qty[g]))
+        for c in range(n):
+            x[g, c] = model.addVar(vtype="I", lb=0, ub=ub, name=f"x_{g}_{c}")
+    for g in range(m):
+        if n > 0:
+            model.addCons(
+                quicksum(x[g, c] for c in range(n)) <= max(0, int(gift_qty[g]))
+            )
+
+    # y[c]: 追加ボックス数。delta[c][r]: ランク到達（目標ランクまでは lb=1 で強制）
+    y = {}
+    delta = {}
+    for c in range(n):
+        r0 = current_ranks[c]
+        rem = (
+            remaining_exp[c]
+            if remaining_exp is not None and c < len(remaining_exp)
+            else None
+        )
+        costs = _rankup_costs(r0, rem)
+        # 絆50到達分を超えるボックスは無意味なので上限にする
+        v = int(box_values[c])
+        ub = 0 if v <= 0 else -(-sum(costs.values()) // v)
+        y[c] = model.addVar(vtype="I", lb=0, ub=ub, name=f"y_{c}")
+
+        forced_to = target_ranks[c]
+        forced_to = min(int(forced_to), _MAX_RANK) if forced_to is not None else r0
+        for r in range(r0 + 1, _MAX_RANK + 1):
+            lb = 1 if r <= forced_to else 0
+            delta[c, r] = model.addVar(vtype="B", lb=lb, name=f"d_{c}_{r}")
+        for r in range(r0 + 2, _MAX_RANK + 1):
+            model.addCons(delta[c, r] <= delta[c, r - 1])
+        consumed = quicksum(
+            costs[r] * delta[c, r] for r in range(r0 + 1, _MAX_RANK + 1)
+        )
+        gained = quicksum(value[g][c] * x[g, c] for g in range(m))
+        model.addCons(consumed <= gained + v * y[c])
+
+    if target_gain is not None and target_gain > 0:
+        bonus_term = quicksum(
+            _range_bonus(bond_bonuses[c], r) * delta[c, r]
+            for c in range(n)
+            for r in range(current_ranks[c] + 1, _MAX_RANK + 1)
+        )
+        model.addCons(bonus_term >= int(target_gain))
+
+    # 主目的: 追加ボックス総数の最小化。同点時は所持贈り物の使用数を最小化。
+    # W は「所持贈り物を全部ケチってもボックス1個の節約に勝てない」重み。
+    weight = sum(max(0, int(q)) for q in gift_qty) + 1
+    total_y = quicksum(y[c] for c in range(n))
+    used_term = quicksum(x[g, c] for g in range(m) for c in range(n))
+    model.setObjective(weight * total_y + used_term, "minimize")
+
+    model.optimize()
+    status = model.getStatus()
+
+    boxes = [0] * n
+    allocation = [[0] * n for _ in range(m)]
+    final_ranks = list(current_ranks)
+    total_gain = 0
+
+    if model.getNSols() > 0:
+        sol = model.getBestSol()
+        for c in range(n):
+            boxes[c] = int(round(model.getSolVal(sol, y[c])))
+            for g in range(m):
+                allocation[g][c] = int(round(model.getSolVal(sol, x[g, c])))
+            r0 = current_ranks[c]
+            cnt = 0
+            for r in range(r0 + 1, _MAX_RANK + 1):
+                if model.getSolVal(sol, delta[c, r]) > 0.5:
+                    cnt += 1
+            final_ranks[c] = r0 + cnt
+        total_gain = sum(
+            bonus_gain(bond_bonuses[c], current_ranks[c], final_ranks[c])
+            for c in range(n)
+        )
+
+    return {
+        "boxes": boxes,
+        "allocation": allocation,
+        "final_ranks": final_ranks,
+        "total_boxes": sum(boxes),
         "total_gain": total_gain,
         "status": status,
     }

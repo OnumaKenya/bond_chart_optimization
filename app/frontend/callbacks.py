@@ -26,7 +26,11 @@ from app.backend.gift_exp import (
     gift_select_box_exp,
     GIFT_SELECT_BOX_ID,
 )
-from app.backend.gift_solver import solve_gift_distribution
+from app.backend.gift_solver import (
+    solve_gift_distribution,
+    solve_required_boxes,
+    bonus_gain,
+)
 from app.frontend.layout import (
     make_student_card,
     _make_bond_rank_input,
@@ -37,6 +41,8 @@ from app.frontend.layout import (
     create_layout,
     build_gs_gift_list,
     gs_default_used,
+    GS_BOX_RANK_WRAP_STYLE,
+    GS_BOX_STATUS_WRAP_STYLE,
 )
 
 
@@ -144,7 +150,9 @@ def gs_update_status_radio(dropdown_value, autosave_data):
 
 
 def _gs_costume_rows(
-    costumes: list[dict], rank_by_index=None, remain_by_index=None
+    costumes: list[dict],
+    rank_by_index=None,
+    remain_by_index=None,
 ) -> list:
     """衣装ごとに 衣装名 / 絆ボーナス(表示のみ) / 現在の絆ランク入力 /
     次の絆上昇までの残り経験値(任意) を生成。
@@ -226,6 +234,39 @@ def _gs_costume_rows(
             )
         )
     return rows
+
+
+def _gs_box_target_rows(costumes: list[dict], target_by_index=None) -> html.Div:
+    """衣装ごとの目標絆ランク入力欄（必要ボックス数計算カード用）。
+
+    target_by_index が与えられた場合は保存値で上書きする。
+    """
+    target_by_index = target_by_index or {}
+    items = []
+    for i, c in enumerate(costumes):
+        target_val = target_by_index.get(i, target_by_index.get(str(i), None))
+        items.append(
+            html.Div(
+                [
+                    html.Span(c["costume_name"], style={"fontSize": "0.85rem"}),
+                    dcc.Input(
+                        id={"type": "gs-bond-target", "index": i},
+                        type="number",
+                        min=1,
+                        max=50,
+                        value=target_val,
+                        debounce=True,
+                        placeholder="任意",
+                        style={"width": "60px", "textAlign": "center"},
+                    ),
+                ],
+                style={"display": "flex", "alignItems": "center", "gap": "4px"},
+            )
+        )
+    return html.Div(
+        items,
+        style={"display": "flex", "flexWrap": "wrap", "gap": "6px 16px"},
+    )
 
 
 # present.tier -> リアクションアイコン (assets/reaction/<name>.png)。
@@ -312,12 +353,16 @@ def _preset_present_children(preset_value, costumes: list[dict]):
     return _gs_present_table(costumes, get_preset_present(*parsed), load_gifts())
 
 
-def _gs_build_view(preset_value, ranks=None, qty=None, use=None, remain=None):
+def _gs_build_view(
+    preset_value, ranks=None, qty=None, use=None, remain=None, targets=None
+):
     """プリセットから 衣装表示 / 好物表 / フィードバック / loaded-store /
-    贈り物リスト を構築する。ranks/qty/use/remain は保存値の上書き（復元用）。
+    贈り物リスト / 目標絆ランク入力欄 を構築する。ranks/qty/use/remain/targets
+    は保存値の上書き（復元用）。
 
     Returns (costume_children, present_children, feedback, store_data,
-    gift_list_children) または失敗時 (None, None, error_span, None, None)。
+    gift_list_children, box_target_children) または失敗時
+    (None, None, error_span, None, None, None)。
     """
     result = get_preset_data(preset_value)
     parsed = parse_preset_value(preset_value)
@@ -326,6 +371,7 @@ def _gs_build_view(preset_value, ranks=None, qty=None, use=None, remain=None):
             None,
             None,
             html.Span("プリセットが見つかりません。", style={"color": "red"}),
+            None,
             None,
             None,
         )
@@ -355,6 +401,7 @@ def _gs_build_view(preset_value, ranks=None, qty=None, use=None, remain=None):
             "costumes": costumes,
         },
         gift_list_children,
+        _gs_box_target_rows(costumes, target_by_index=targets),
     )
 
 
@@ -364,6 +411,7 @@ def _gs_build_view(preset_value, ranks=None, qty=None, use=None, remain=None):
     Output("gs-load-feedback", "children"),
     Output("gs-loaded-preset", "data"),
     Output("gs-gift-list", "children"),
+    Output("gs-box-rank-targets", "children"),
     Input("gs-load-preset-btn", "n_clicks"),
     State("gs-preset-dropdown", "value"),
     State("gs-status-radio", "value"),
@@ -378,13 +426,19 @@ def gs_load_preset(n_clicks, dropdown_value, status_value):
             html.Span("プリセットを選択してください。", style={"color": "red"}),
             no_update,
             no_update,
+            no_update,
         )
-    costume_children, present_children, feedback, store, gift_list = _gs_build_view(
-        preset_value
-    )
+    (
+        costume_children,
+        present_children,
+        feedback,
+        store,
+        gift_list,
+        box_targets,
+    ) = _gs_build_view(preset_value)
     if store is None:
-        return (no_update, no_update, feedback, no_update, no_update)
-    return (costume_children, present_children, feedback, store, gift_list)
+        return (no_update, no_update, feedback, no_update, no_update, no_update)
+    return (costume_children, present_children, feedback, store, gift_list, box_targets)
 
 
 # ----------------------------------------------------------------------
@@ -398,12 +452,17 @@ def gs_load_preset(n_clicks, dropdown_value, status_value):
     Input("gs-status-radio", "value"),
     Input({"type": "gs-bond-rank", "index": ALL}, "value"),
     Input({"type": "gs-bond-remain", "index": ALL}, "value"),
+    Input({"type": "gs-bond-target", "index": ALL}, "value"),
     Input({"type": "gs-gift-qty", "gift": ALL}, "value"),
     Input({"type": "gs-gift-use", "gift": ALL}, "value"),
+    Input("gs-box-target-mode", "value"),
+    Input("gs-box-target-status", "value"),
     State({"type": "gs-bond-rank", "index": ALL}, "id"),
     State({"type": "gs-bond-remain", "index": ALL}, "id"),
+    State({"type": "gs-bond-target", "index": ALL}, "id"),
     State({"type": "gs-gift-qty", "gift": ALL}, "id"),
     State({"type": "gs-gift-use", "gift": ALL}, "id"),
+    State("gs-autosave-ready", "data"),
     prevent_initial_call=True,
 )
 def gs_save_autosave(
@@ -411,13 +470,22 @@ def gs_save_autosave(
     status_value,
     rank_values,
     remain_values,
+    target_values,
     qty_values,
     use_values,
+    box_mode,
+    box_status,
     rank_ids,
     remain_ids,
+    target_ids,
     qty_ids,
     use_ids,
+    ready,
 ):
+    # 復元前の保存は禁止。動的レイアウト挿入直後は prevent_initial_call が
+    # 効かず初期値で発火するため、そのまま保存すると復元前のデータが潰れる。
+    if not ready:
+        raise PreventUpdate
     ranks = {
         str(rid["index"]): rv
         for rv, rid in zip(rank_values, rank_ids)
@@ -427,6 +495,11 @@ def gs_save_autosave(
         str(rid["index"]): rv
         for rv, rid in zip(remain_values, remain_ids)
         if rv is not None
+    }
+    targets = {
+        str(tid["index"]): tv
+        for tv, tid in zip(target_values, target_ids)
+        if tv is not None
     }
     qty = {}
     for qv, qid in zip(qty_values, qty_ids):
@@ -441,8 +514,11 @@ def gs_save_autosave(
         "preset_value": _combined_preset_value(dropdown_value, status_value),
         "ranks": ranks,
         "remain": remain,
+        "targets": targets,
         "qty": qty,
         "use": use,
+        "box_mode": box_mode,
+        "box_status": box_status,
     }
 
 
@@ -453,18 +529,26 @@ def gs_save_autosave(
     Output("gs-load-feedback", "children", allow_duplicate=True),
     Output("gs-loaded-preset", "data", allow_duplicate=True),
     Output("gs-gift-list", "children", allow_duplicate=True),
+    Output("gs-box-rank-targets", "children", allow_duplicate=True),
+    Output("gs-box-target-mode", "value"),
+    Output("gs-box-target-status", "value"),
+    Output("gs-autosave-ready", "data"),
     Input("gs-autosave-init", "n_intervals"),
     State("gs-autosave", "data"),
     prevent_initial_call=True,
 )
 def gs_restore_autosave(_n, data):
+    # 復元するものがなくても ready フラグは立てる（以降の保存を許可）
     if not data:
-        raise PreventUpdate
+        return (no_update,) * 9 + (True,)
     preset_value = data.get("preset_value")
     qty = data.get("qty") or {}
     use = data.get("use") or {}
     ranks = data.get("ranks") or {}
     remain = data.get("remain") or {}
+    targets = data.get("targets") or {}
+    box_mode = data.get("box_mode") or "rank"
+    box_status = data.get("box_status")
 
     if not preset_value:
         # プリセット未選択でも所持数・使用フラグは復元する
@@ -475,13 +559,31 @@ def gs_restore_autosave(_n, data):
             qty_by_gift=qty,
             use_by_gift=use,
         )
-        return (None, no_update, no_update, no_update, no_update, gift_list)
+        return (
+            None,
+            no_update,
+            no_update,
+            no_update,
+            no_update,
+            gift_list,
+            no_update,
+            box_mode,
+            box_status,
+            True,
+        )
 
-    costume_children, present_children, feedback, store, gift_list = _gs_build_view(
-        preset_value, ranks=ranks, qty=qty, use=use, remain=remain
+    (
+        costume_children,
+        present_children,
+        feedback,
+        store,
+        gift_list,
+        box_targets,
+    ) = _gs_build_view(
+        preset_value, ranks=ranks, qty=qty, use=use, remain=remain, targets=targets
     )
     if store is None:
-        raise PreventUpdate
+        return (no_update,) * 9 + (True,)
     return (
         _dropdown_student(preset_value),
         costume_children,
@@ -489,6 +591,10 @@ def gs_restore_autosave(_n, data):
         feedback,
         store,
         gift_list,
+        box_targets,
+        box_mode,
+        box_status,
+        True,
     )
 
 
@@ -531,11 +637,14 @@ def _gs_result_table(
     final_ranks: list,
     other_normal_alloc=None,
     other_high_alloc=None,
+    extra_rows: list | None = None,
 ) -> html.Table:
     """贈り物×衣装の配分マトリクス（MILP 解）。
 
     other_normal_alloc / other_high_alloc が list（衣装ごとの配分数）なら
     その他(通常)/その他(高級) の集約行として表示する。None なら非表示。
+    extra_rows は (ラベル, 衣装ごとの個数リスト) の列で、最終絆ランク行の
+    直前に強調表示で追加する（不足ボックス数など）。
     """
     ncol = len(col_names)
 
@@ -593,6 +702,20 @@ def _gs_result_table(
             )
         )
 
+    for label_text, counts in extra_rows or []:
+        body.append(
+            html.Tr(
+                [html.Td(label_text, style={**_TD_LABEL, "fontWeight": "bold"})]
+                + [
+                    html.Td(
+                        str(counts[ci]),
+                        style={**_TD, "fontWeight": "bold", "background": "#f3e5f5"},
+                    )
+                    for ci in range(ncol)
+                ]
+            )
+        )
+
     # 最終絆ランク行（色分け）
     rank_cells = [
         html.Td(
@@ -618,56 +741,28 @@ def _gs_result_table(
     )
 
 
-@callback(
-    Output("gs-calc-result", "children"),
-    Input("gs-calc-btn", "n_clicks"),
-    State("gs-loaded-preset", "data"),
-    State({"type": "gs-gift-use", "gift": ALL}, "value"),
-    State({"type": "gs-gift-use", "gift": ALL}, "id"),
-    State({"type": "gs-gift-qty", "gift": ALL}, "value"),
-    State({"type": "gs-gift-qty", "gift": ALL}, "id"),
-    State({"type": "gs-bond-rank", "index": ALL}, "value"),
-    State({"type": "gs-bond-rank", "index": ALL}, "id"),
-    State({"type": "gs-bond-remain", "index": ALL}, "value"),
-    State({"type": "gs-bond-remain", "index": ALL}, "id"),
-    prevent_initial_call=True,
-)
-def gs_calculate(
-    n_clicks,
-    loaded,
-    use_values,
-    use_ids,
-    qty_values,
-    qty_ids,
-    rank_values,
-    rank_ids,
-    remain_values,
-    remain_ids,
-):
-    """MILP(SCIP) で贈り物配分を最適化し、マトリクスを表示する。"""
-    if not loaded:
-        return html.Span("先にプリセットを読み込んでください。", style={"color": "red"})
-
-    costumes = loaded.get("costumes", [])
-    if not costumes:
-        return html.Span("衣装がありません。", style={"color": "red"})
-
-    # 現在の絆ランク（衣装index順）
+def _gs_parse_current_ranks(rank_values, rank_ids, n: int) -> list[int]:
+    """現在の絆ランク入力を衣装 index 順のリストにする（不正値は20）。"""
     rank_by_idx = {rid["index"]: rv for rv, rid in zip(rank_values, rank_ids)}
     current_ranks = []
-    for i in range(len(costumes)):
+    for i in range(n):
         v = rank_by_idx.get(i)
         try:
             v = int(v)
         except (TypeError, ValueError):
             v = 20
         current_ranks.append(min(50, max(1, v)))
+    return current_ranks
 
-    # 次の絆上昇までの残り経験値（任意・衣装index順）。
-    # 未入力/不正/0以下は None（= 通常どおりレベル満額を要求）。
+
+def _gs_parse_remaining_exp(remain_values, remain_ids, n: int) -> list[int | None]:
+    """次の絆上昇までの残り経験値入力を衣装 index 順のリストにする。
+
+    未入力/不正/0以下は None（= 通常どおりレベル満額を要求）。
+    """
     remain_by_idx = {rid["index"]: rv for rv, rid in zip(remain_values, remain_ids)}
     remaining_exp: list[int | None] = []
-    for i in range(len(costumes)):
+    for i in range(n):
         rv = remain_by_idx.get(i)
         try:
             rv = int(rv)
@@ -676,8 +771,42 @@ def gs_calculate(
         if rv is not None and rv <= 0:
             rv = None
         remaining_exp.append(rv)
+    return remaining_exp
 
-    # 使用フラグ・所持数
+
+def _gs_box_values(costumes: list[dict], present: dict, type_by_id: dict) -> list[int]:
+    """衣装ごとの 贈り物選択ボックス1個あたり獲得EXP。"""
+    values = []
+    for c in costumes:
+        tiers = present.get(c["costume_name"], {})
+        rows = [(type_by_id.get(gid, ""), tier) for gid, tier in tiers.items()]
+        values.append(gift_select_box_exp(rows))
+    return values
+
+
+def _gs_build_gift_inputs(
+    costumes: list[dict],
+    present: dict,
+    catalog: list[dict],
+    use_values,
+    use_ids,
+    qty_values,
+    qty_ids,
+):
+    """使用ON贈り物を MILP 入力（個別 + プール集約）へ変換する。
+
+    使用ON贈り物を「個別」と「その他(集約)」に振り分ける。
+     個別     : 好み(present) / all型 / 贈り物選択ボックス
+     その他通常: 上記以外の素 normal（非好み=一律20EXP相当）
+     その他高級: 上記以外の素 high （非好み=一律120EXP相当）
+
+    Returns
+    -------
+    (individual_gifts, value, gift_qty, pool_idx_normal, pool_idx_high)
+        individual_gifts : 個別扱いの贈り物（カタログ行）
+        value / gift_qty : プール擬似贈り物 2 行を含む MILP 入力
+        pool_idx_normal / pool_idx_high : プール行の index（無ければ None）
+    """
     used_ids = {
         uid["gift"] for uid, val in zip(use_ids, use_values) if val and "use" in val
     }
@@ -688,19 +817,10 @@ def gs_calculate(
         except (TypeError, ValueError):
             qty_by_gift[qid["gift"]] = 0
 
-    catalog = load_gifts()
     type_by_id = {g["id"]: g["gift_type"] for g in catalog}
-
-    student = loaded["student_name"]
-    status_name = loaded["status_name"]
-    present = get_preset_present(student, status_name)  # 衣装名->{gift:tier}
     preferred = {gid for tiers in present.values() for gid in tiers}
     ncol = len(costumes)
 
-    # 使用ON贈り物を「個別」と「その他(集約)」に振り分ける。
-    #  個別     : 好み(present) / all型 / 贈り物選択ボックス
-    #  その他通常: 上記以外の素 normal（非好み=一律20EXP相当）
-    #  その他高級: 上記以外の素 high （非好み=一律120EXP相当）
     individual_gifts = []
     pool_normal_qty = 0
     pool_high_qty = 0
@@ -748,6 +868,60 @@ def gs_calculate(
         pool_idx_high = len(value)
         value.append([other_high_exp] * ncol)
         gift_qty.append(pool_high_qty)
+
+    return individual_gifts, value, gift_qty, pool_idx_normal, pool_idx_high
+
+
+@callback(
+    Output("gs-calc-result", "children"),
+    Input("gs-calc-btn", "n_clicks"),
+    State("gs-loaded-preset", "data"),
+    State({"type": "gs-gift-use", "gift": ALL}, "value"),
+    State({"type": "gs-gift-use", "gift": ALL}, "id"),
+    State({"type": "gs-gift-qty", "gift": ALL}, "value"),
+    State({"type": "gs-gift-qty", "gift": ALL}, "id"),
+    State({"type": "gs-bond-rank", "index": ALL}, "value"),
+    State({"type": "gs-bond-rank", "index": ALL}, "id"),
+    State({"type": "gs-bond-remain", "index": ALL}, "value"),
+    State({"type": "gs-bond-remain", "index": ALL}, "id"),
+    prevent_initial_call=True,
+)
+def gs_calculate(
+    n_clicks,
+    loaded,
+    use_values,
+    use_ids,
+    qty_values,
+    qty_ids,
+    rank_values,
+    rank_ids,
+    remain_values,
+    remain_ids,
+):
+    """MILP(SCIP) で贈り物配分を最適化し、マトリクスを表示する。"""
+    if not loaded:
+        return html.Span("先にプリセットを読み込んでください。", style={"color": "red"})
+
+    costumes = loaded.get("costumes", [])
+    if not costumes:
+        return html.Span("衣装がありません。", style={"color": "red"})
+
+    # 現在の絆ランク / 次の絆上昇までの残り経験値（衣装index順）
+    current_ranks = _gs_parse_current_ranks(rank_values, rank_ids, len(costumes))
+    remaining_exp = _gs_parse_remaining_exp(remain_values, remain_ids, len(costumes))
+
+    student = loaded["student_name"]
+    status_name = loaded["status_name"]
+    present = get_preset_present(student, status_name)  # 衣装名->{gift:tier}
+    (
+        individual_gifts,
+        value,
+        gift_qty,
+        pool_idx_normal,
+        pool_idx_high,
+    ) = _gs_build_gift_inputs(
+        costumes, present, load_gifts(), use_values, use_ids, qty_values, qty_ids
+    )
 
     bond_bonuses = [c["bond_bonuses"] for c in costumes]
 
@@ -814,6 +988,199 @@ def gs_calculate(
                 style={"fontWeight": "bold", "marginRight": "12px"},
             ),
             *status_note,
+        ],
+        style={"margin": "4px 0"},
+    )
+    return html.Div([summary, table])
+
+
+# ----------------------------------------------------------------------
+# 贈り物配分シミュレータ: 必要な贈り物選択ボックス数
+# ----------------------------------------------------------------------
+
+
+@callback(
+    Output("gs-box-rank-target-wrap", "style"),
+    Output("gs-box-status-target-wrap", "style"),
+    Input("gs-box-target-mode", "value"),
+)
+def gs_toggle_box_target_inputs(mode):
+    """目標指定方法の選択に応じて、対応する目標入力欄のみ表示する。"""
+    if mode == "status":
+        return (
+            {**GS_BOX_RANK_WRAP_STYLE, "display": "none"},
+            GS_BOX_STATUS_WRAP_STYLE,
+        )
+    return (
+        GS_BOX_RANK_WRAP_STYLE,
+        {**GS_BOX_STATUS_WRAP_STYLE, "display": "none"},
+    )
+
+
+@callback(
+    Output("gs-box-calc-result", "children"),
+    Input("gs-box-calc-btn", "n_clicks"),
+    State("gs-loaded-preset", "data"),
+    State("gs-box-target-mode", "value"),
+    State("gs-box-target-status", "value"),
+    State({"type": "gs-gift-use", "gift": ALL}, "value"),
+    State({"type": "gs-gift-use", "gift": ALL}, "id"),
+    State({"type": "gs-gift-qty", "gift": ALL}, "value"),
+    State({"type": "gs-gift-qty", "gift": ALL}, "id"),
+    State({"type": "gs-bond-rank", "index": ALL}, "value"),
+    State({"type": "gs-bond-rank", "index": ALL}, "id"),
+    State({"type": "gs-bond-remain", "index": ALL}, "value"),
+    State({"type": "gs-bond-remain", "index": ALL}, "id"),
+    State({"type": "gs-bond-target", "index": ALL}, "value"),
+    State({"type": "gs-bond-target", "index": ALL}, "id"),
+    prevent_initial_call=True,
+)
+def gs_box_calculate(
+    n_clicks,
+    loaded,
+    mode,
+    target_status,
+    use_values,
+    use_ids,
+    qty_values,
+    qty_ids,
+    rank_values,
+    rank_ids,
+    remain_values,
+    remain_ids,
+    target_values,
+    target_ids,
+):
+    """目標（絆ランク or ステータス上昇量）達成に不足するボックス数を計算する。
+
+    使用ONの所持贈り物（選択ボックス含む）を最適に配分した上で、
+    それでも足りない分の贈り物選択ボックス数を最小化する。
+    """
+    if not loaded:
+        return html.Span("先にプリセットを読み込んでください。", style={"color": "red"})
+
+    costumes = loaded.get("costumes", [])
+    if not costumes:
+        return html.Span("衣装がありません。", style={"color": "red"})
+
+    n = len(costumes)
+    current_ranks = _gs_parse_current_ranks(rank_values, rank_ids, n)
+    remaining_exp = _gs_parse_remaining_exp(remain_values, remain_ids, n)
+
+    catalog = load_gifts()
+    present = get_preset_present(loaded["student_name"], loaded["status_name"])
+    type_by_id = {g["id"]: g["gift_type"] for g in catalog}
+    box_values = _gs_box_values(costumes, present, type_by_id)
+    (
+        individual_gifts,
+        value,
+        gift_qty,
+        pool_idx_normal,
+        pool_idx_high,
+    ) = _gs_build_gift_inputs(
+        costumes, present, catalog, use_values, use_ids, qty_values, qty_ids
+    )
+    bond_bonuses = [c["bond_bonuses"] for c in costumes]
+
+    target_ranks = None
+    target_gain = None
+    if mode == "status":
+        try:
+            target_gain = int(target_status)
+        except (TypeError, ValueError):
+            target_gain = 0
+        if target_gain <= 0:
+            return html.Span(
+                "目標ステータス上昇量（1以上の整数）を入力してください。",
+                style={"color": "red"},
+            )
+        max_gain = sum(
+            bonus_gain(c["bond_bonuses"], current_ranks[i], 50)
+            for i, c in enumerate(costumes)
+        )
+        if target_gain > max_gain:
+            return html.Span(
+                f"全衣装を絆50にしても上昇量は +{max_gain} が上限です。"
+                "目標を下げてください。",
+                style={"color": "red"},
+            )
+        target_desc = f"目標 +{target_gain}"
+    else:
+        # 目標絆ランクモード（衣装index順、未入力/不正は None = 対象外）
+        target_by_idx = {tid["index"]: tv for tv, tid in zip(target_values, target_ids)}
+        target_ranks = []
+        for i in range(n):
+            tv = target_by_idx.get(i)
+            try:
+                tv = min(50, max(1, int(tv)))
+            except (TypeError, ValueError):
+                tv = None
+            target_ranks.append(tv)
+        if all(tv is None for tv in target_ranks):
+            return html.Span(
+                "目標絆ランクを入力してください（空欄の衣装は計算対象外）。",
+                style={"color": "red"},
+            )
+        target_desc = "目標: " + " / ".join(
+            f"{c['costume_name']} 絆{target_ranks[i]}"
+            for i, c in enumerate(costumes)
+            if target_ranks[i] is not None
+        )
+
+    try:
+        result = solve_required_boxes(
+            current_ranks,
+            bond_bonuses,
+            gift_qty,
+            value,
+            box_values,
+            target_ranks=target_ranks,
+            target_gain=target_gain,
+            remaining_exp=remaining_exp,
+        )
+    except Exception as e:
+        return html.Span(f"計算エラー: {e}", style={"color": "red"})
+
+    status = result["status"]
+    if status not in ("optimal", "timelimit"):
+        return html.Span(
+            f"解を得られませんでした（SCIP: {status}）。",
+            style={"color": "red"},
+        )
+
+    alloc = result["allocation"]
+    n_ind = len(individual_gifts)
+    other_normal_alloc = (
+        list(alloc[pool_idx_normal]) if pool_idx_normal is not None else None
+    )
+    other_high_alloc = list(alloc[pool_idx_high]) if pool_idx_high is not None else None
+
+    col_names = [c["costume_name"] for c in costumes]
+    table = _gs_result_table(
+        col_names,
+        individual_gifts,
+        alloc[:n_ind],
+        result["final_ranks"],
+        other_normal_alloc,
+        other_high_alloc,
+        extra_rows=[("追加ボックス（不足分）", result["boxes"])],
+    )
+    note = []
+    if status == "timelimit":
+        note.append(
+            html.Span(
+                "（時間制限到達: 暫定解。最小とは限りません）",
+                style={"color": "#e67e22", "fontSize": "0.8rem"},
+            )
+        )
+    summary = html.Div(
+        [
+            html.Span(
+                f"不足分の贈り物選択ボックス: 合計 {result['total_boxes']} 個"
+                f"（ステータス上昇 +{result['total_gain']} / {target_desc}）",
+                style={"fontWeight": "bold", "marginRight": "12px"},
+            ),
+            *note,
         ],
         style={"margin": "4px 0"},
     )
@@ -1011,9 +1378,7 @@ def update_students(
         )
 
     if trigger == "load-preset-btn":
-        preset_name = _combined_preset_value(
-            preset_dropdown_value, preset_status_value
-        )
+        preset_name = _combined_preset_value(preset_dropdown_value, preset_status_value)
         if not preset_name:
             raise PreventUpdate
         result = get_preset_data(preset_name)
@@ -1142,6 +1507,7 @@ def render_and_reorder_priority(
     State("next-student-index", "data"),
     State({"type": "costume", "index": ALL}, "id"),
     State({"type": "bond-rank", "index": ALL}, "id"),
+    State("autosave-ready", "data"),
     prevent_initial_call=True,
 )
 def save_autosave(
@@ -1155,7 +1521,12 @@ def save_autosave(
     next_index,
     costume_ids,
     rank_ids,
+    ready,
 ):
+    # 復元前の保存は禁止。動的レイアウト挿入直後は prevent_initial_call が
+    # 効かず初期値で発火するため、そのまま保存すると復元前のデータが潰れる。
+    if not ready:
+        raise PreventUpdate
     if not indices:
         raise PreventUpdate
     costumes = {str(cid["index"]): cv for cv, cid in zip(costume_values, costume_ids)}
@@ -1180,13 +1551,15 @@ def save_autosave(
     Output("bond50-penalty", "value", allow_duplicate=True),
     Output("preset-dropdown", "value"),
     Output("present-display", "children", allow_duplicate=True),
+    Output("autosave-ready", "data"),
     Input("autosave-init", "n_intervals"),
     State("autosave", "data"),
     prevent_initial_call=True,
 )
 def restore_autosave(_n, data):
+    # 復元するものがなくても ready フラグは立てる（以降の保存を許可）
     if not data or not data.get("indices"):
-        raise PreventUpdate
+        return (no_update,) * 8 + (True,)
 
     penalty = data.get("penalty", 0)
     preset_value = data.get("preset_value")
@@ -1227,10 +1600,11 @@ def restore_autosave(_n, data):
                 penalty if penalty is not None else 0,
                 _dropdown_student(preset_value),
                 _preset_present_children(preset_value, students),
+                True,
             )
 
     # プリセット未選択: デフォルト状態（衣装1つ）
-    raise PreventUpdate
+    return (no_update,) * 8 + (True,)
 
 
 @callback(

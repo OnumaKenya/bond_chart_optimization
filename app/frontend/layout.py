@@ -769,6 +769,9 @@ def create_layout() -> html.Div:
             dcc.Store(id="submit-preset-status"),
             dcc.Store(id="costume-priority-order", data=[{"idx": 0, "name": "衣装1"}]),
             dcc.Store(id="autosave", storage_type="local"),
+            # 復元完了フラグ: False の間は autosave への保存をブロックする
+            # （動的レイアウト挿入時の初期発火で保存データが潰れるのを防ぐ）
+            dcc.Store(id="autosave-ready", data=False),
             dcc.Store(id="favorites", storage_type="local", data=[]),
             dcc.Interval(id="autosave-init", max_intervals=1, interval=200),
             _footer(),
@@ -789,6 +792,16 @@ def create_layout() -> html.Div:
 
 # プリセットの好み/all 型に関わらず、常にデフォルト使用可とする贈り物。
 _GS_ALWAYS_USED = {"gift-select-box"}
+
+# 必要ボックス数カード: 目標入力ブロックの基本スタイル。
+# 表示/非表示はモード選択に応じて callbacks 側で display を切り替える。
+GS_BOX_RANK_WRAP_STYLE = {"margin": "6px 0 10px"}
+GS_BOX_STATUS_WRAP_STYLE = {
+    "display": "flex",
+    "alignItems": "center",
+    "gap": "4px",
+    "margin": "6px 0 10px",
+}
 
 
 def gs_default_used(gift: dict, preferred: set | frozenset = frozenset()) -> bool:
@@ -1102,8 +1115,115 @@ def create_gift_simulator_layout() -> html.Div:
                 ],
                 style={"marginTop": "16px"},
             ),
+            # 必要な贈り物選択ボックス数
+            html.Div(
+                [
+                    html.Strong("必要な贈り物選択ボックス数"),
+                    html.P(
+                        "目標（絆ランク または ステータス上昇量）の達成に不足する"
+                        "贈り物選択ボックスの個数を計算します。"
+                        "使用ONの所持贈り物（選択ボックス含む）を最適に使い切った上で、"
+                        "それでも足りない分を追加ボックス数として表示します。",
+                        style={
+                            "fontSize": "0.8rem",
+                            "color": "#666",
+                            "margin": "6px 0",
+                        },
+                    ),
+                    dcc.RadioItems(
+                        id="gs-box-target-mode",
+                        options=[
+                            {
+                                "label": "目標絆ランク（衣装ごと）",
+                                "value": "rank",
+                            },
+                            {
+                                "label": "目標ステータス上昇量（合計）",
+                                "value": "status",
+                            },
+                        ],
+                        value="rank",
+                        inline=True,
+                        style={"fontSize": "0.85rem"},
+                        labelStyle={"marginRight": "14px", "cursor": "pointer"},
+                    ),
+                    html.Div(
+                        [
+                            html.P(
+                                "衣装ごとの目標絆ランク（空欄の衣装は計算対象外）:",
+                                style={
+                                    "fontSize": "0.8rem",
+                                    "color": "#666",
+                                    "margin": "0 0 6px",
+                                },
+                            ),
+                            html.Div(
+                                id="gs-box-rank-targets",
+                                children=html.P(
+                                    "プリセットを読み込んでください。",
+                                    style={
+                                        "color": "#888",
+                                        "fontSize": "0.8rem",
+                                        "margin": "0",
+                                    },
+                                ),
+                            ),
+                        ],
+                        id="gs-box-rank-target-wrap",
+                        style=GS_BOX_RANK_WRAP_STYLE,
+                    ),
+                    html.Div(
+                        [
+                            html.Span(
+                                "目標ステータス上昇量: ",
+                                style={"fontSize": "0.85rem"},
+                                title="現在ランクからの絆ボーナス上昇量の合計。",
+                            ),
+                            dcc.Input(
+                                id="gs-box-target-status",
+                                type="number",
+                                min=1,
+                                debounce=True,
+                                placeholder="例: 100",
+                                style={"width": "90px", "textAlign": "center"},
+                            ),
+                        ],
+                        id="gs-box-status-target-wrap",
+                        style={**GS_BOX_STATUS_WRAP_STYLE, "display": "none"},
+                    ),
+                    html.Button(
+                        "必要数を計算",
+                        id="gs-box-calc-btn",
+                        n_clicks=0,
+                        style={
+                            "background": "#8e44ad",
+                            "color": "white",
+                            "border": "none",
+                            "borderRadius": "4px",
+                            "padding": "8px 24px",
+                            "fontSize": "0.95rem",
+                            "cursor": "pointer",
+                        },
+                    ),
+                    dcc.Loading(
+                        type="circle",
+                        children=html.Div(
+                            id="gs-box-calc-result",
+                            style={"marginTop": "12px", "minHeight": "24px"},
+                        ),
+                    ),
+                ],
+                style={
+                    "padding": "12px",
+                    "border": "1px solid #ccc",
+                    "borderRadius": "8px",
+                    "marginTop": "16px",
+                },
+            ),
             dcc.Store(id="gs-loaded-preset"),
             dcc.Store(id="gs-autosave", storage_type="local"),
+            # 復元完了フラグ: False の間は gs-autosave への保存をブロックする
+            dcc.Store(id="gs-autosave-ready", data=False),
             dcc.Interval(id="gs-autosave-init", max_intervals=1, interval=300),
             _footer(),
         ],

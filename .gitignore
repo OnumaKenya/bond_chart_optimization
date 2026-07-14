@@ -23,4 +23,5 @@ dist/
 *.spec
 
 # data file
-data
+data/*
+!data/.gitkeep
