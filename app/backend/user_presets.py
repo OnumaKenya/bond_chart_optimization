@@ -243,6 +243,29 @@ def delete_preset(key: str) -> bool:
 # ======================================================================
 
 
+# ドロップダウン選択肢はページ表示のたびに DB へ往復しないよう
+# 短時間キャッシュする。プリセット投稿・管理画面での編集時は
+# _invalidate_options_cache() で即時反映させる（別プロセスの
+# キャッシュは TTL まで古いままになり得る）。
+_OPTIONS_CACHE_TTL = 300.0  # 秒
+_options_cache: dict[str, tuple[float, object]] = {}
+
+
+def _cached_options(key: str, loader):
+    now = time.time()
+    hit = _options_cache.get(key)
+    if hit is not None and now - hit[0] < _OPTIONS_CACHE_TTL:
+        return hit[1]
+    options = loader()
+    if options:  # 空（DBエラー等）はキャッシュしない
+        _options_cache[key] = (now, options)
+    return options
+
+
+def _invalidate_options_cache() -> None:
+    _options_cache.clear()
+
+
 def _kata_to_hira(text: str) -> str:
     """カタカナをひらがなに変換する。"""
     return "".join(chr(ord(c) - 0x60) if "\u30a1" <= c <= "\u30f6" else c for c in text)
@@ -315,6 +338,7 @@ def register_costume_preset(
             "ON CONFLICT (student_name, status_name) DO NOTHING",
             (student_name, status_name),
         )
+    _invalidate_options_cache()
 
 
 # DB接続の有無（UI側でフォールバック時の挙動を切り替える用）。
@@ -430,14 +454,7 @@ def get_all_presets_for_dropdown() -> list[dict]:
     return options
 
 
-def get_student_options() -> list[dict]:
-    """生徒選択ドロップダウン用のオプションを返す。
-
-    値は生徒名。表示は優先度 (student_priority) 順 → 生徒名順。
-    DB未接続時は旧形式（キー単位）のオプションを返す。
-    """
-    if not _DATABASE_URL:
-        return get_all_presets_for_dropdown()
+def _load_student_options() -> list[dict]:
     try:
         conn = _get_conn()
         with conn.cursor() as cur:
@@ -453,6 +470,107 @@ def get_student_options() -> list[dict]:
         _logger.exception("DB read error")
         return []
     return [{"label": r[0], "value": r[0], "search": _search_text(r[0])} for r in rows]
+
+
+def get_student_options() -> list[dict]:
+    """生徒選択ドロップダウン用のオプションを返す（短時間キャッシュ）。
+
+    値は生徒名。表示は優先度 (student_priority) 順 → 生徒名順。
+    DB未接続時は旧形式（キー単位）のオプションを返す。
+    """
+    if not _DATABASE_URL:
+        return get_all_presets_for_dropdown()
+    return _cached_options("students", _load_student_options)
+
+
+def _costume_label(student_name: str, costume_name: str) -> str:
+    """生徒（衣装）の表示名。既定の「通常」衣装は生徒名のみ。"""
+    if costume_name == "通常":
+        return student_name
+    return f"{student_name}（{costume_name}）"
+
+
+def _load_costume_options() -> list[dict]:
+    try:
+        conn = _get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT c.id, c.student_name, c.costume_name FROM costume c "
+                "LEFT JOIN student_priority sp ON sp.student_name = c.student_name "
+                "ORDER BY COALESCE(sp.priority, 1000000), c.student_name, "
+                "c.sort_order, c.id"
+            )
+            rows = cur.fetchall()
+    except Exception:
+        _logger.exception("DB read error")
+        return []
+    return [
+        {
+            "label": _costume_label(r[1], r[2]),
+            "value": r[0],
+            "search": _search_text(f"{r[1]} {r[2]}"),
+        }
+        for r in rows
+    ]
+
+
+def get_costume_options() -> list[dict]:
+    """生徒（衣装）選択ドロップダウン用のオプションを返す（短時間キャッシュ）。
+
+    値は costume.id。表示は優先度 (student_priority) 順 → 生徒名順 →
+    衣装の定義順。DB未接続時は空リスト。
+    """
+    if not _DATABASE_URL:
+        return []
+    return _cached_options("costumes", _load_costume_options)
+
+
+def get_costume_label(costume_id) -> str | None:
+    """costume.id から 生徒（衣装） の表示名を返す。見つからなければ None。"""
+    if not _DATABASE_URL or costume_id is None:
+        return None
+    try:
+        conn = _get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT student_name, costume_name FROM costume WHERE id = %s",
+                (int(costume_id),),
+            )
+            row = cur.fetchone()
+    except Exception:
+        _logger.exception("DB read error")
+        return None
+    if not row:
+        return None
+    return _costume_label(row[0], row[1])
+
+
+def _load_costume_present_map(costume_id) -> dict[str, str]:
+    try:
+        conn = _get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT gift_id, tier FROM present WHERE costume_id = %s",
+                (int(costume_id),),
+            )
+            return {r[0]: r[1] for r in cur.fetchall()}
+    except Exception:
+        _logger.exception("DB read error")
+        return {}
+
+
+def get_costume_present_map(costume_id) -> dict[str, str]:
+    """衣装の present を {gift_id: tier} で返す（短時間キャッシュ）。
+
+    get_preset_present の1衣装分と同形式。DB未接続・未登録時は空辞書
+    （= 好み無し。選択ボックスは通常 normal の 20 EXP 扱い）。
+    """
+    if not _DATABASE_URL or costume_id is None:
+        return {}
+    return _cached_options(
+        f"present:{int(costume_id)}",
+        lambda: _load_costume_present_map(costume_id),
+    )
 
 
 def get_status_options_for(student_name: str) -> list[dict]:
@@ -664,6 +782,7 @@ def admin_rebuild_preset(
                 (new_student, new_status, approved),
             )
         conn.commit()
+        _invalidate_options_cache()
     except Exception:
         conn.rollback()
         raise
@@ -695,6 +814,7 @@ def admin_delete_preset(student: str, status: str) -> None:
                 (student, status),
             )
         conn.commit()
+        _invalidate_options_cache()
     except Exception:
         conn.rollback()
         raise
@@ -724,12 +844,14 @@ def admin_upsert_priority(student: str, priority: int) -> None:
             "ON CONFLICT (student_name) DO UPDATE SET priority = EXCLUDED.priority",
             (student, priority),
         )
+    _invalidate_options_cache()
 
 
 def admin_delete_priority(student: str) -> None:
     conn = _get_conn()
     with conn.cursor() as cur:
         cur.execute("DELETE FROM student_priority WHERE student_name = %s", (student,))
+    _invalidate_options_cache()
 
 
 # ======================================================================
@@ -861,7 +983,9 @@ def admin_add_costume(student_name: str, costume_name: str) -> int:
             "RETURNING id",
             (student_name, costume_name),
         )
-        return cur.fetchone()[0]
+        costume_id = cur.fetchone()[0]
+    _invalidate_options_cache()
+    return costume_id
 
 
 def admin_load_present(costume_id: int) -> dict[str, str]:
@@ -913,6 +1037,7 @@ def admin_save_present(costume_id: int, mapping: dict[str, str]) -> None:
                     (costume_id, tier, gift_id),
                 )
         conn.commit()
+        _invalidate_options_cache()
     except Exception:
         conn.rollback()
         raise

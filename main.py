@@ -71,6 +71,20 @@ application.clientside_callback(
     prevent_initial_call=True,
 )
 
+# --- ページタブ: アクティブ表示の切り替え（サーバー往復なし） ---
+application.clientside_callback(
+    """
+    function(pathname, ids) {
+        return ids.map(
+            id => 'page-tab' + (id.path === pathname ? ' page-tab-active' : '')
+        );
+    }
+    """,
+    Output({"type": "page-tab", "path": ALL}, "className"),
+    Input("url", "pathname"),
+    State({"type": "page-tab", "path": ALL}, "id"),
+)
+
 # --- マニュアルモーダル開閉 ---
 application.clientside_callback(
     """

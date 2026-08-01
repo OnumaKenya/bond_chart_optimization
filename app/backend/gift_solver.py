@@ -70,6 +70,25 @@ def exp_to_reach_rank(current_rank: int, target_rank: int, remaining_exp=None) -
     )
 
 
+def boxes_to_reach_rank(
+    current_rank: int,
+    target_rank: int,
+    box_exp: int,
+    remaining_exp=None,
+) -> int:
+    """贈り物選択ボックスのみで current_rank から target_rank に上げるのに
+    必要なボックス個数（切り上げ）。
+
+    box_exp は ボックス1個あたりの獲得EXP（gift_select_box_exp の値）。
+    target_rank <= current_rank または box_exp <= 0 なら 0。
+    remaining_exp の扱いは exp_to_reach_rank と同じ。
+    """
+    need = exp_to_reach_rank(current_rank, target_rank, remaining_exp)
+    if need <= 0 or box_exp <= 0:
+        return 0
+    return -(-need // box_exp)
+
+
 def bonus_gain(bond_bonuses: list[int], from_rank: int, to_rank: int) -> int:
     """from_rank から to_rank へのランクアップで得られる絆ボーナス合計。"""
     return sum(

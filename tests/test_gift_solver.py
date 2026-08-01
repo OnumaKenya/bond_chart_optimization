@@ -8,6 +8,7 @@ import pytest
 from app.backend.gift_solver import (
     exp_to_reach_rank,
     bonus_gain,
+    boxes_to_reach_rank,
     solve_required_boxes,
 )
 
@@ -45,6 +46,43 @@ class TestExpToReachRank:
 
     def test_target_capped_at_50(self):
         assert exp_to_reach_rank(49, 60) == exp_to_reach_rank(49, 50)
+
+
+# ---------------------------------------------------------------------------
+# boxes_to_reach_rank
+# ---------------------------------------------------------------------------
+
+
+class TestBoxesToReachRank:
+    def test_exact_division(self):
+        # 1 -> 2 は 15 EXP。box_exp=15 なら 1 個
+        assert boxes_to_reach_rank(1, 2, 15) == 1
+
+    def test_ceil(self):
+        # 15 EXP を 20/box で 1 個、10/box で 2 個
+        assert boxes_to_reach_rank(1, 2, 20) == 1
+        assert boxes_to_reach_rank(1, 2, 10) == 2
+
+    def test_multi_rank(self):
+        # 1 -> 3 は 45 EXP。20/box -> 3 個
+        assert boxes_to_reach_rank(1, 3, 20) == 3
+
+    def test_target_not_above_current(self):
+        assert boxes_to_reach_rank(10, 10, 20) == 0
+        assert boxes_to_reach_rank(10, 5, 20) == 0
+
+    def test_zero_box_exp(self):
+        assert boxes_to_reach_rank(1, 50, 0) == 0
+
+    def test_remaining_exp(self):
+        # 最初のランクアップのみ残りEXPで置き換え（1->2 が 5 EXP になる）
+        assert boxes_to_reach_rank(1, 2, 20, remaining_exp=5) == 1
+        assert boxes_to_reach_rank(1, 3, 20, remaining_exp=5) == 2  # 5+30=35
+
+    def test_full_1_to_50(self):
+        # 絆1->50 の総EXPを 80/box で切り上げ
+        total = exp_to_reach_rank(1, 50)
+        assert boxes_to_reach_rank(1, 50, 80) == -(-total // 80)
 
 
 # ---------------------------------------------------------------------------

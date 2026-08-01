@@ -9,9 +9,12 @@ from app.backend.presets import PRESETS
 from app.backend.student import BOND_RANGES
 from app.frontend.layout import (
     create_layout,
+    create_required_exp_layout,
+    create_root_layout,
     make_student_card,
     _make_bond_rank_input,
     _default_costume_name,
+    PAGES,
 )
 
 
@@ -140,6 +143,84 @@ class TestCreateLayout:
         assert len(found) == 1
         container = found[0]
         assert len(container.children) == 1
+
+
+# ---------------------------------------------------------------------------
+# create_required_exp_layout
+# ---------------------------------------------------------------------------
+
+
+class TestRequiredExpLayout:
+    """create_required_exp_layout() が必要な要素を含むことを検証する。"""
+
+    @pytest.fixture()
+    def layout(self):
+        return create_required_exp_layout()
+
+    def test_page_container_class(self, layout):
+        assert layout.className == "page-container"
+
+    def test_registered_in_pages(self):
+        assert "/required-exp" in PAGES
+        label, builder = PAGES["/required-exp"]
+        assert label == "必要絆経験値"
+        assert builder is create_required_exp_layout
+
+    @pytest.mark.parametrize(
+        "component_id",
+        [
+            "rb-costume-dropdown",
+            "rb-add-costume-btn",
+            "rb-add-feedback",
+            "rb-costume-container",
+            "rb-gift-list",
+            "rb-calc-btn",
+            "rb-calc-result",
+            "rb-costumes",
+            "rb-autosave",
+            "rb-autosave-ready",
+            "rb-autosave-init",
+        ],
+    )
+    def test_has_components(self, layout, component_id):
+        found = _find_by_id(layout, component_id)
+        assert len(found) == 1, f"'{component_id}' が見つからない"
+
+    def test_costumes_store_default_empty(self, layout):
+        store = _find_by_id(layout, "rb-costumes")[0]
+        assert store.data == []
+
+
+# ---------------------------------------------------------------------------
+# 共通ヘッダー（タイトル・報告先・ページ切替タブ）
+# ---------------------------------------------------------------------------
+
+
+class TestSiteHeader:
+    """ルートレイアウトの共通ヘッダーとタブを検証する。"""
+
+    @pytest.fixture()
+    def root(self):
+        return create_root_layout()
+
+    def test_has_site_header(self, root):
+        assert len(_find_by_class(root, "site-header")) == 1
+        assert len(_find_by_class(root, "site-title")) == 1
+
+    def test_has_page_content(self, root):
+        assert len(_find_by_id(root, "page-content")) == 1
+
+    def test_tabs_cover_all_pages(self, root):
+        tab_bars = _find_by_class(root, "page-tabs")
+        assert len(tab_bars) == 1
+        tabs = _find_by_class(root, "page-tab")
+        assert {t.href for t in tabs} == set(PAGES.keys())
+
+    @pytest.mark.parametrize("path", list(PAGES.keys()))
+    def test_pages_have_no_own_tabs(self, path):
+        # タブは共通ヘッダーに1つだけ。各ページ側には持たせない。
+        _, builder = PAGES[path]
+        assert _find_by_class(builder(), "page-tabs") == []
 
 
 # ---------------------------------------------------------------------------

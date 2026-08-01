@@ -5,6 +5,7 @@ from dash import html, dcc
 
 from app.backend.student import BOND_RANGES
 from app.backend.user_presets import (
+    get_costume_options,
     get_student_options,
     gift_image_src,
     load_gifts,
@@ -268,26 +269,24 @@ def create_privacy_layout() -> html.Div:
     )
 
 
-def _page_switch_link(current_path: str) -> dcc.Link:
-    """現在のページ以外のページへ切り替えるリンク（タイトル横に配置）。"""
-    target_path, target_label = next(
-        (path, label) for path, (label, _) in PAGES.items() if path != current_path
-    )
-    return dcc.Link(
-        f"🔀 {target_label}",
-        href=target_path,
-        className="page-switch-link",
-        style={
-            "fontSize": "0.9rem",
-            "color": "#4a90d9",
-            "fontWeight": "bold",
-            "textDecoration": "none",
-            "border": "1px solid #4a90d9",
-            "borderRadius": "6px",
-            "padding": "6px 14px",
-            "background": "#fff",
-            "whiteSpace": "nowrap",
-        },
+def _page_tabs_bar() -> html.Div:
+    """ページ切り替えタブバー（共通ヘッダー内に1つだけ配置）。
+
+    アクティブ表示は URL に応じてクライアントサイドで className を
+    切り替える（main.py のコールバック参照）。見た目は style.css の
+    .page-tab / .page-tab-active で定義する。
+    """
+    return html.Div(
+        [
+            dcc.Link(
+                label,
+                href=path,
+                id={"type": "page-tab", "path": path},
+                className="page-tab",
+            )
+            for path, (label, _) in PAGES.items()
+        ],
+        className="page-tabs",
     )
 
 
@@ -298,19 +297,6 @@ def create_layout() -> html.Div:
                 [
                     html.Div(
                         [
-                            html.H1("絆上げ優先度計算機", style={"margin": "0"}),
-                            _page_switch_link("/chart-opt"),
-                        ],
-                        style={
-                            "display": "flex",
-                            "alignItems": "center",
-                            "gap": "16px",
-                            "flexWrap": "wrap",
-                        },
-                    ),
-                    html.Div(
-                        [
-                            _contact_span(),
                             html.Button(
                                 "📖 マニュアル",
                                 id="open-manual-btn",
@@ -793,16 +779,6 @@ def create_layout() -> html.Div:
 # プリセットの好み/all 型に関わらず、常にデフォルト使用可とする贈り物。
 _GS_ALWAYS_USED = {"gift-select-box"}
 
-# 必要ボックス数カード: 目標入力ブロックの基本スタイル。
-# 表示/非表示はモード選択に応じて callbacks 側で display を切り替える。
-GS_BOX_RANK_WRAP_STYLE = {"margin": "6px 0 10px"}
-GS_BOX_STATUS_WRAP_STYLE = {
-    "display": "flex",
-    "alignItems": "center",
-    "gap": "4px",
-    "margin": "6px 0 10px",
-}
-
 
 def gs_default_used(gift: dict, preferred: set | frozenset = frozenset()) -> bool:
     """贈り物の使用フラグ既定値。
@@ -816,10 +792,14 @@ def gs_default_used(gift: dict, preferred: set | frozenset = frozenset()) -> boo
     )
 
 
-def _gs_gift_card(gift: dict, default_use: bool, qty: int = 0) -> html.Div:
+def _gs_gift_card(
+    gift: dict, default_use: bool, qty: int = 0, id_prefix: str = "gs"
+) -> html.Div:
     """贈り物1件のコンパクトカード（アイコン・所持数・使用可否）。
 
     名前は非表示で、マウスオーバー時に title で表示する。
+    id_prefix でページごとのコンポーネントID型 (<prefix>-gift-use /
+    <prefix>-gift-qty) を切り替える。
     """
     gid = gift["id"]
     is_high = gift["gift_type"] in ("high", "high-all")
@@ -832,13 +812,13 @@ def _gs_gift_card(gift: dict, default_use: bool, qty: int = 0) -> html.Div:
             html.Div(
                 [
                     dcc.Checklist(
-                        id={"type": "gs-gift-use", "gift": gid},
+                        id={"type": f"{id_prefix}-gift-use", "gift": gid},
                         options=[{"label": "", "value": "use"}],
                         value=["use"] if default_use else [],
                         style={"margin": "0"},
                     ),
                     dcc.Input(
-                        id={"type": "gs-gift-qty", "gift": gid},
+                        id={"type": f"{id_prefix}-gift-qty", "gift": gid},
                         type="number",
                         min=0,
                         value=qty,
@@ -885,13 +865,14 @@ def build_gs_gift_list(
     is_used,
     qty_by_gift: dict | None = None,
     use_by_gift: dict | None = None,
+    id_prefix: str = "gs",
 ) -> list:
     """使用フラグONの贈り物のみ表示し、残りは折りたたみに格納する。
 
     qty_by_gift / use_by_gift が与えられた場合は所持数・使用フラグの
     保存値で上書きする（入力復元用）。
 
-    gs-gift-list の children として使う要素リストを返す。
+    贈り物リスト表示の children として使う要素リストを返す。
     """
     qty_by_gift = qty_by_gift or {}
     use_by_gift = use_by_gift or {}
@@ -903,7 +884,7 @@ def build_gs_gift_list(
         else:
             u = bool(is_used(g))
         qty = qty_by_gift.get(gid, 0)
-        (used if u else unused).append(_gs_gift_card(g, u, qty))
+        (used if u else unused).append(_gs_gift_card(g, u, qty, id_prefix))
     children = []
     if used:
         children.append(_gs_gift_grid(used))
@@ -949,23 +930,6 @@ def create_gift_simulator_layout() -> html.Div:
     gift_list_children = build_gs_gift_list(gifts, lambda g: gs_default_used(g))
     return html.Div(
         [
-            html.Div(
-                [
-                    html.H1("贈り物配分シミュレータ", style={"margin": "0"}),
-                    _page_switch_link("/gift-simulation"),
-                ],
-                style={
-                    "display": "flex",
-                    "alignItems": "center",
-                    "gap": "16px",
-                    "flexWrap": "wrap",
-                    "marginBottom": "4px",
-                },
-            ),
-            html.Div(
-                _contact_span(nowrap=False),
-                style={"marginBottom": "16px"},
-            ),
             # プリセット読み込み
             html.Div(
                 [
@@ -1115,111 +1079,6 @@ def create_gift_simulator_layout() -> html.Div:
                 ],
                 style={"marginTop": "16px"},
             ),
-            # 必要な贈り物選択ボックス数
-            html.Div(
-                [
-                    html.Strong("必要な贈り物選択ボックス数"),
-                    html.P(
-                        "目標（絆ランク または ステータス上昇量）の達成に不足する"
-                        "贈り物選択ボックスの個数を計算します。"
-                        "使用ONの所持贈り物（選択ボックス含む）を最適に使い切った上で、"
-                        "それでも足りない分を追加ボックス数として表示します。",
-                        style={
-                            "fontSize": "0.8rem",
-                            "color": "#666",
-                            "margin": "6px 0",
-                        },
-                    ),
-                    dcc.RadioItems(
-                        id="gs-box-target-mode",
-                        options=[
-                            {
-                                "label": "目標絆ランク（衣装ごと）",
-                                "value": "rank",
-                            },
-                            {
-                                "label": "目標ステータス上昇量（合計）",
-                                "value": "status",
-                            },
-                        ],
-                        value="rank",
-                        inline=True,
-                        style={"fontSize": "0.85rem"},
-                        labelStyle={"marginRight": "14px", "cursor": "pointer"},
-                    ),
-                    html.Div(
-                        [
-                            html.P(
-                                "衣装ごとの目標絆ランク（空欄の衣装は計算対象外）:",
-                                style={
-                                    "fontSize": "0.8rem",
-                                    "color": "#666",
-                                    "margin": "0 0 6px",
-                                },
-                            ),
-                            html.Div(
-                                id="gs-box-rank-targets",
-                                children=html.P(
-                                    "プリセットを読み込んでください。",
-                                    style={
-                                        "color": "#888",
-                                        "fontSize": "0.8rem",
-                                        "margin": "0",
-                                    },
-                                ),
-                            ),
-                        ],
-                        id="gs-box-rank-target-wrap",
-                        style=GS_BOX_RANK_WRAP_STYLE,
-                    ),
-                    html.Div(
-                        [
-                            html.Span(
-                                "目標ステータス上昇量: ",
-                                style={"fontSize": "0.85rem"},
-                                title="現在ランクからの絆ボーナス上昇量の合計。",
-                            ),
-                            dcc.Input(
-                                id="gs-box-target-status",
-                                type="number",
-                                min=1,
-                                debounce=True,
-                                placeholder="例: 100",
-                                style={"width": "90px", "textAlign": "center"},
-                            ),
-                        ],
-                        id="gs-box-status-target-wrap",
-                        style={**GS_BOX_STATUS_WRAP_STYLE, "display": "none"},
-                    ),
-                    html.Button(
-                        "必要数を計算",
-                        id="gs-box-calc-btn",
-                        n_clicks=0,
-                        style={
-                            "background": "#8e44ad",
-                            "color": "white",
-                            "border": "none",
-                            "borderRadius": "4px",
-                            "padding": "8px 24px",
-                            "fontSize": "0.95rem",
-                            "cursor": "pointer",
-                        },
-                    ),
-                    dcc.Loading(
-                        type="circle",
-                        children=html.Div(
-                            id="gs-box-calc-result",
-                            style={"marginTop": "12px", "minHeight": "24px"},
-                        ),
-                    ),
-                ],
-                style={
-                    "padding": "12px",
-                    "border": "1px solid #ccc",
-                    "borderRadius": "8px",
-                    "marginTop": "16px",
-                },
-            ),
             dcc.Store(id="gs-loaded-preset"),
             dcc.Store(id="gs-autosave", storage_type="local"),
             # 復元完了フラグ: False の間は gs-autosave への保存をブロックする
@@ -1238,13 +1097,183 @@ def create_gift_simulator_layout() -> html.Div:
 
 
 # ======================================================================
+# 必要絆経験値（ページ）
+# ======================================================================
+
+
+def create_required_exp_layout() -> html.Div:
+    """必要絆経験値 計算ページ。
+
+    生徒（衣装）ごとに、現在の絆ランクから目標絆ランクまでに必要な
+    絆経験値と、その贈り物選択ボックス換算個数を計算する。
+    """
+    return html.Div(
+        [
+            html.P(
+                "追加した生徒（衣装）ごとに、現在の絆ランク（既定 20）から"
+                "目標絆ランク（既定 50）まで上げるのに必要な絆経験値を計算します。"
+                "所持している贈り物を入力すると、最適に充当した上で"
+                "それでも不足する絆経験値と、その贈り物選択ボックス換算の"
+                "個数を表示します（ボックス1個あたりの獲得EXPは衣装の好物"
+                "（通常タイプの最高効果）で決まります）。",
+                style={"fontSize": "0.85rem", "color": "#666", "margin": "0 0 16px"},
+            ),
+            # 生徒（衣装）の追加
+            html.Div(
+                [
+                    html.Strong("衣装の追加"),
+                    html.Div(
+                        [
+                            html.Div(
+                                dcc.Dropdown(
+                                    id="rb-costume-dropdown",
+                                    options=get_costume_options(),
+                                    placeholder="生徒（衣装）を選択...",
+                                ),
+                                style={"flex": "1", "minWidth": "0"},
+                            ),
+                            html.Button(
+                                "＋ 追加",
+                                id="rb-add-costume-btn",
+                                n_clicks=0,
+                                style={
+                                    "flexShrink": "0",
+                                    "background": "#27ae60",
+                                    "color": "white",
+                                    "border": "none",
+                                    "borderRadius": "4px",
+                                    "padding": "6px 16px",
+                                    "cursor": "pointer",
+                                },
+                            ),
+                        ],
+                        style={
+                            "display": "flex",
+                            "gap": "6px",
+                            "alignItems": "stretch",
+                            "marginTop": "6px",
+                        },
+                    ),
+                    html.Div(
+                        id="rb-add-feedback",
+                        style={"marginTop": "6px", "fontSize": "0.85rem"},
+                    ),
+                ],
+                style={
+                    "padding": "12px",
+                    "border": "1px solid #ccc",
+                    "borderRadius": "8px",
+                    "background": "#f5f5ff",
+                    "marginBottom": "16px",
+                    "maxWidth": "480px",
+                },
+            ),
+            # 追加済み衣装の 現在絆ランク / 目標絆ランク 入力
+            html.Div(
+                [
+                    html.Strong("衣装 / 現在の絆ランク / 目標絆ランク"),
+                    html.Div(
+                        id="rb-costume-container",
+                        children=html.P(
+                            "生徒（衣装）を追加してください。",
+                            style={"color": "#888", "margin": "8px 0"},
+                        ),
+                        style={"marginTop": "8px"},
+                    ),
+                ],
+                style={
+                    "padding": "12px",
+                    "border": "1px solid #ccc",
+                    "borderRadius": "8px",
+                    "marginBottom": "16px",
+                },
+            ),
+            # 贈り物リスト（所持数・使用可否）
+            html.Div(
+                [
+                    html.Strong("所持贈り物（所持数・使用可否）"),
+                    html.P(
+                        "所持数を入力すると、追加した衣装へ最適に充当した上で"
+                        "不足分を計算します。すべて 0 のままでも計算できます"
+                        "（純粋な必要絆経験値のみ）。追加した衣装の好物・"
+                        "全生徒対象・選択ボックス以外は効率が悪いため"
+                        "デフォルトで使用OFF（折りたたみ内）です。",
+                        style={
+                            "fontSize": "0.8rem",
+                            "color": "#666",
+                            "margin": "6px 0 0",
+                        },
+                    ),
+                    html.Div(
+                        build_gs_gift_list(
+                            load_gifts(),
+                            lambda g: gs_default_used(g),
+                            id_prefix="rb",
+                        ),
+                        id="rb-gift-list",
+                        style={"marginTop": "8px"},
+                    ),
+                ],
+                style={
+                    "padding": "12px",
+                    "border": "1px solid #ccc",
+                    "borderRadius": "8px",
+                    "marginBottom": "16px",
+                },
+            ),
+            # 計算
+            html.Div(
+                [
+                    html.Button(
+                        "必要絆経験値を計算",
+                        id="rb-calc-btn",
+                        n_clicks=0,
+                        style={
+                            "background": "#8e44ad",
+                            "color": "white",
+                            "border": "none",
+                            "borderRadius": "4px",
+                            "padding": "10px 32px",
+                            "fontSize": "1rem",
+                            "cursor": "pointer",
+                        },
+                    ),
+                    dcc.Loading(
+                        type="circle",
+                        children=html.Div(
+                            id="rb-calc-result",
+                            style={"marginTop": "12px", "minHeight": "24px"},
+                        ),
+                    ),
+                ],
+            ),
+            # 追加済みの生徒（衣装）リスト [{costume_id, label}, ...]
+            dcc.Store(id="rb-costumes", data=[]),
+            dcc.Store(id="rb-autosave", storage_type="local"),
+            # 復元完了フラグ: False の間は rb-autosave への保存をブロックする
+            dcc.Store(id="rb-autosave-ready", data=False),
+            dcc.Interval(id="rb-autosave-init", max_intervals=1, interval=300),
+            _footer(),
+        ],
+        className="page-container",
+        style={
+            "maxWidth": "1200px",
+            "margin": "0 auto",
+            "padding": "20px",
+            "fontFamily": "sans-serif",
+        },
+    )
+
+
+# ======================================================================
 # ルートレイアウト（URL ルーティング）
 # ======================================================================
 
-# ページ切り替えリンクに出す主要ページ。
+# ページ切り替えタブに出す主要ページ。
 PAGES = {
     "/chart-opt": ("絆上げ優先度計算機", create_layout),
     "/gift-simulation": ("贈り物配分シミュレータ", create_gift_simulator_layout),
+    "/required-exp": ("必要絆経験値", create_required_exp_layout),
 }
 
 # 主要ページ以外のページ（フッター等からのみアクセス）。
@@ -1257,10 +1286,46 @@ ROOT_REDIRECT = "/chart-opt"
 
 
 def create_root_layout() -> html.Div:
-    """dcc.Location によるページ切り替えのルートシェル。"""
+    """共通ヘッダー（タイトル・報告先・タブ）+ ページ切り替えのルートシェル。
+
+    ヘッダーとタブはページ遷移で再描画されず、page-content のみ差し替わる。
+    """
     return html.Div(
         [
             dcc.Location(id="url"),
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.H1(
+                                "絆上げ優先度計算機",
+                                className="site-title",
+                                style={"margin": "0", "fontSize": "1.5rem"},
+                            ),
+                            html.Div(
+                                _contact_span(nowrap=False),
+                                style={"marginLeft": "auto"},
+                            ),
+                        ],
+                        className="site-header",
+                        style={
+                            "display": "flex",
+                            "alignItems": "center",
+                            "gap": "16px",
+                            "flexWrap": "wrap",
+                            "marginBottom": "10px",
+                        },
+                    ),
+                    _page_tabs_bar(),
+                ],
+                className="site-header-wrap",
+                style={
+                    "maxWidth": "1200px",
+                    "margin": "0 auto",
+                    "padding": "16px 20px 0",
+                    "fontFamily": "sans-serif",
+                },
+            ),
             html.Div(id="page-content"),
         ]
     )
