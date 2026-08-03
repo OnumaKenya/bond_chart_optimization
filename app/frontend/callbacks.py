@@ -1084,16 +1084,12 @@ def _rb_swap_indices(by_index: dict[int, object], i: int, j: int) -> dict[int, o
 
 def _rb_values_by_index(values, ids) -> dict[int, object]:
     """パターンマッチ入力を {index: 値} にまとめる（None は除外）。"""
-    return {
-        vid["index"]: v for v, vid in zip(values, ids) if v is not None
-    }
+    return {vid["index"]: v for v, vid in zip(values, ids) if v is not None}
 
 
 def _rb_preferred(entries: list[dict]) -> set[str]:
     """追加済み衣装の好物 gift_id の和集合。"""
-    return {
-        gid for e in entries for gid in get_costume_present_map(e["costume_id"])
-    }
+    return {gid for e in entries for gid in get_costume_present_map(e["costume_id"])}
 
 
 def _rb_merge_use_flags(catalog, use_by_gift, old_pref, new_pref) -> dict[str, bool]:
@@ -1307,9 +1303,7 @@ def rb_calculate(
     """
     entries = entries or []
     if not entries:
-        return html.Span(
-            "先に生徒（衣装）を追加してください。", style={"color": "red"}
-        )
+        return html.Span("先に生徒（衣装）を追加してください。", style={"color": "red"})
 
     n = len(entries)
     current_ranks = _gs_parse_current_ranks(
@@ -1364,8 +1358,7 @@ def rb_calculate(
     boxes = result["boxes"]
     # 衣装ごとの所持贈り物からの獲得EXP
     covered = [
-        sum(value[g][c] * alloc[g][c] for g in range(len(gift_qty)))
-        for c in range(n)
+        sum(value[g][c] * alloc[g][c] for g in range(len(gift_qty))) for c in range(n)
     ]
 
     header = html.Tr(
@@ -1536,12 +1529,10 @@ def rb_save_autosave(
             str(k): v for k, v in _rb_values_by_index(rank_values, rank_ids).items()
         },
         "remain": {
-            str(k): v
-            for k, v in _rb_values_by_index(remain_values, remain_ids).items()
+            str(k): v for k, v in _rb_values_by_index(remain_values, remain_ids).items()
         },
         "targets": {
-            str(k): v
-            for k, v in _rb_values_by_index(target_values, target_ids).items()
+            str(k): v for k, v in _rb_values_by_index(target_values, target_ids).items()
         },
         "qty": qty,
         "use": use,

@@ -1174,9 +1174,7 @@ def create_required_exp_layout() -> html.Div:
             # 追加済み衣装の 現在絆ランク / 目標絆ランク 入力
             html.Div(
                 [
-                    html.Strong(
-                        "衣装（上ほど優先） / 現在の絆ランク / 目標絆ランク"
-                    ),
+                    html.Strong("衣装（上ほど優先） / 現在の絆ランク / 目標絆ランク"),
                     html.Div(
                         id="rb-costume-container",
                         children=html.P(
