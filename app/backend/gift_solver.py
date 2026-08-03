@@ -13,6 +13,8 @@
   max sum_c sum_r b_c(r) delta[c][r]
 """
 
+from time import monotonic
+
 from app.backend.bond_exp import BOND_EXP_PER_LEVEL
 from app.backend.student import BOND_RANGES
 
@@ -240,13 +242,15 @@ def solve_required_boxes(
     target_gain: int | None = None,
     time_limit: float = DEFAULT_TIME_LIMIT,
     remaining_exp: list[int | None] | None = None,
+    box_priorities: list[int | None] | None = None,
 ) -> dict:
     """目標達成に不足する贈り物選択ボックス数の最小値を求める。
 
     所持贈り物（gift_qty / value、solve_gift_distribution と同形式）を
     自由に配分してよい前提で、目標の達成に追加で必要な
-    贈り物選択ボックスの総数を最小化する。同点時は所持贈り物の
-    使用数が最少の解を選ぶ（無駄な配分を避ける）。
+    贈り物選択ボックスの総数を最小化する。同点時は box_priorities の
+    順位が上の衣装から不足ボックス数を最小化し（辞書式）、最後に
+    所持贈り物の使用数が最少の解を選ぶ（無駄な配分を避ける）。
 
     目標は次のいずれか（両方指定した場合は両方を課す）:
       - target_ranks : 衣装ごとの目標絆ランク（None の衣装は対象外）
@@ -258,6 +262,13 @@ def solve_required_boxes(
         衣装ごとの ボックス1個あたり獲得EXP（gift_select_box_exp の値）。
         所持している選択ボックスは gift_qty / value 側に含めてよい
         （その場合ここで数えるのは「追加で必要な」個数）。
+    box_priorities : list[int | None] | None
+        衣装ごとの優先順位（1 が最優先、同値は同順位）。追加ボックスの
+        総数が最小である解の中から、順位が上のグループほど不足ボックス
+        数が少ない解を辞書式に選ぶ（= 順位が上の衣装から所持贈り物を
+        充当する）。総ボックス数が増えることはない。None・不正値・
+        1 未満は「順位未指定」として最後のグループ扱い。全衣装が
+        同一グループなら従来どおり 1 回の求解。
 
     Returns
     -------
@@ -277,6 +288,21 @@ def solve_required_boxes(
     m = len(gift_qty)
     if target_ranks is None:
         target_ranks = [None] * n
+    # 優先順位を正規化し、順位ごとの衣装グループ（上位から順）を作る。
+    # 未指定（None・不正値・1未満）は最後のグループにまとめる。
+    prio: list[int | None] = []
+    for c in range(n):
+        try:
+            r = int(box_priorities[c]) if box_priorities is not None else None
+        except (TypeError, ValueError, IndexError):
+            r = None
+        prio.append(r if r is not None and r >= 1 else None)
+    groups = [
+        [c for c in range(n) if prio[c] == r]
+        for r in sorted({r for r in prio if r is not None})
+    ]
+    if any(r is None for r in prio):
+        groups.append([c for c in range(n) if prio[c] is None])
     has_rank_target = any(
         t is not None and t > current_ranks[c] for c, t in enumerate(target_ranks)
     )
@@ -343,33 +369,96 @@ def solve_required_boxes(
         )
         model.addCons(bonus_term >= int(target_gain))
 
-    # 主目的: 追加ボックス総数の最小化。同点時は所持贈り物の使用数を最小化。
-    # W は「所持贈り物を全部ケチってもボックス1個の節約に勝てない」重み。
-    weight = sum(max(0, int(q)) for q in gift_qty) + 1
+    # 主目的: 追加ボックス総数の最小化。同点時は優先順位の高いグループ
+    # から順に不足ボックス数を最小化し（辞書式）、最後に所持贈り物の
+    # 使用数を最小化する（無駄な配分を避ける）。
     total_y = quicksum(y[c] for c in range(n))
     used_term = quicksum(x[g, c] for g in range(m) for c in range(n))
-    model.setObjective(weight * total_y + used_term, "minimize")
 
-    model.optimize()
-    status = model.getStatus()
+    def _extract():
+        sol = model.getBestSol()
+        bx = [int(round(model.getSolVal(sol, y[c]))) for c in range(n)]
+        al = [
+            [int(round(model.getSolVal(sol, x[g, c]))) for c in range(n)]
+            for g in range(m)
+        ]
+        fr = []
+        for c in range(n):
+            r0 = current_ranks[c]
+            cnt = sum(
+                1
+                for r in range(r0 + 1, _MAX_RANK + 1)
+                if model.getSolVal(sol, delta[c, r]) > 0.5
+            )
+            fr.append(r0 + cnt)
+        return bx, al, fr
+
+    snapshot = None
+    statuses = []
+
+    if len(groups) <= 1:
+        # 優先順位の指定なし（実質1グループ）: 従来どおり1回の求解。
+        # W は「所持贈り物を全部ケチってもボックス1個の節約に勝てない」重み。
+        weight = sum(max(0, int(q)) for q in gift_qty) + 1
+        model.setObjective(weight * total_y + used_term, "minimize")
+        model.optimize()
+        statuses.append(model.getStatus())
+        if model.getNSols() > 0:
+            snapshot = _extract()
+    else:
+        # 辞書式最適化: 上位の目的値を制約として固定しながら順に解く。
+        # time_limit は全段の合計に対する制限として扱う。
+        deadline = monotonic() + time_limit
+
+        def _optimize():
+            model.setParam("limits/time", max(0.1, deadline - monotonic()))
+            model.optimize()
+            statuses.append(model.getStatus())
+            return model.getNSols() > 0
+
+        model.setObjective(total_y, "minimize")
+        if _optimize():
+            snapshot = _extract()
+            bound = int(round(model.getObjVal()))
+            model.freeTransform()
+            model.addCons(total_y <= bound)
+            # 最後のグループは総数と他グループから一意に決まるので省略。
+            # 上位グループの合計が総数に達したら残りは 0 で確定なので省略。
+            ok = True
+            fixed = 0
+            for grp in groups[:-1]:
+                if fixed >= bound:
+                    break
+                grp_y = quicksum(y[c] for c in grp)
+                model.setObjective(grp_y, "minimize")
+                if not _optimize():
+                    ok = False
+                    break
+                snapshot = _extract()
+                grp_bound = int(round(model.getObjVal()))
+                model.freeTransform()
+                model.addCons(grp_y <= grp_bound)
+                fixed += grp_bound
+            if ok:
+                model.setObjective(used_term, "minimize")
+                if _optimize():
+                    snapshot = _extract()
+
+    if all(s == "optimal" for s in statuses):
+        status = "optimal"
+    elif snapshot is not None:
+        # 途中で時間制限等に達した場合は暫定解として扱う
+        status = "timelimit"
+    else:
+        status = statuses[0]
 
     boxes = [0] * n
     allocation = [[0] * n for _ in range(m)]
     final_ranks = list(current_ranks)
     total_gain = 0
 
-    if model.getNSols() > 0:
-        sol = model.getBestSol()
-        for c in range(n):
-            boxes[c] = int(round(model.getSolVal(sol, y[c])))
-            for g in range(m):
-                allocation[g][c] = int(round(model.getSolVal(sol, x[g, c])))
-            r0 = current_ranks[c]
-            cnt = 0
-            for r in range(r0 + 1, _MAX_RANK + 1):
-                if model.getSolVal(sol, delta[c, r]) > 0.5:
-                    cnt += 1
-            final_ranks[c] = r0 + cnt
+    if snapshot is not None:
+        boxes, allocation, final_ranks = snapshot
         total_gain = sum(
             bonus_gain(bond_bonuses[c], current_ranks[c], final_ranks[c])
             for c in range(n)

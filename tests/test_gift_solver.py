@@ -247,3 +247,94 @@ class TestSolveRequiredBoxesRankTarget:
         assert result["status"] == "optimal"
         assert result["total_gain"] >= 2
         assert result["final_ranks"][0] >= 2
+
+
+class TestSolveRequiredBoxesPriorities:
+    """box_priorities（衣装ごとの優先順位）指定。"""
+
+    def test_priority_costume_gets_shared_gift(self):
+        # 両衣装とも 1 -> 2 (15 EXP)、共有の 15 EXP ×1 はどちらに使っても
+        # 総ボックス数は同じ 1 個。順位が上（=1）の衣装2に充当される。
+        result = _solve(
+            [1, 1],
+            [BONUS_FIRST, BONUS_FIRST],
+            [20, 20],
+            gifts=[(1, [15, 15])],
+            target_ranks=[2, 2],
+            box_priorities=[2, 1],
+        )
+        assert result["status"] == "optimal"
+        assert result["allocation"][0] == [0, 1]
+        assert result["boxes"] == [1, 0]
+
+    def test_total_boxes_never_increase(self):
+        # 両衣装 1 -> 5 (110 EXP)。贈り物は衣装1に 40 EXP / 衣装2に 20 EXP。
+        # 総数最小は衣装1に2個の 2+6=8個のみ。衣装2を最優先にしても
+        # 総数が増える配分（衣装2に充当して 6+4=10個）は選ばれない。
+        kwargs = dict(gifts=[(2, [40, 20])], target_ranks=[5, 5])
+        base = _solve([1, 1], [BONUS_FIRST] * 2, [20, 20], **kwargs)
+        assert base["status"] == "optimal"
+        assert base["boxes"] == [2, 6]
+
+        result = _solve(
+            [1, 1],
+            [BONUS_FIRST] * 2,
+            [20, 20],
+            box_priorities=[2, 1],
+            **kwargs,
+        )
+        assert result["status"] == "optimal"
+        assert result["total_boxes"] == 8
+        assert result["boxes"] == [2, 6]
+
+    def test_lexicographic_order(self):
+        # 3衣装とも 1 -> 2 (15 EXP)、15 EXP ×2 は2衣装分にしか足りない。
+        # 順位 [3, 1, 2] なら衣装2・3に充当し、衣装1が不足になる。
+        result = _solve(
+            [1, 1, 1],
+            [BONUS_FIRST] * 3,
+            [20, 20, 20],
+            gifts=[(2, [15, 15, 15])],
+            target_ranks=[2, 2, 2],
+            box_priorities=[3, 1, 2],
+        )
+        assert result["status"] == "optimal"
+        assert result["allocation"][0] == [0, 1, 1]
+        assert result["boxes"] == [1, 0, 0]
+
+    def test_unspecified_priority_goes_last(self):
+        # 順位未指定（None）は最後扱い。指定のある衣装2が優先される。
+        result = _solve(
+            [1, 1],
+            [BONUS_FIRST, BONUS_FIRST],
+            [20, 20],
+            gifts=[(1, [15, 15])],
+            target_ranks=[2, 2],
+            box_priorities=[None, 1],
+        )
+        assert result["status"] == "optimal"
+        assert result["allocation"][0] == [0, 1]
+        assert result["boxes"] == [1, 0]
+
+    def test_uniform_priorities_match_default(self):
+        # 全衣装同順位なら従来の総数最小化と同じ結果
+        kwargs = dict(gifts=[(2, [40, 20])], target_ranks=[5, 5])
+        base = _solve([1, 1], [BONUS_FIRST] * 2, [20, 20], **kwargs)
+        same = _solve(
+            [1, 1], [BONUS_FIRST] * 2, [20, 20], box_priorities=[1, 1], **kwargs
+        )
+        assert same["status"] == "optimal"
+        assert same["boxes"] == base["boxes"]
+        assert same["total_boxes"] == base["total_boxes"]
+
+    def test_infeasible_with_priorities(self):
+        # 辞書式パスでも実行不能は infeasible のまま返す
+        result = _solve(
+            [1, 1],
+            [BONUS_FIRST] * 2,
+            [0, 20],
+            target_ranks=[2, 2],
+            box_priorities=[1, 2],
+        )
+        assert result["status"] == "infeasible"
+        assert result["total_boxes"] == 0

@@ -947,7 +947,8 @@ _RB_EMPTY_MSG = html.P(
 
 def _rb_costume_rows(entries: list[dict], ranks=None, remains=None, targets=None):
     """追加済み生徒（衣装）ごとの 現在絆ランク / 残りEXP / 目標絆ランク /
-    削除ボタン の入力行を生成。ranks/remains/targets は入力値の引き継ぎ用
+    並び替え・削除ボタン の入力行を生成。並び順がそのまま優先順位
+    （上が最優先）。ranks/remains/targets は入力値の引き継ぎ用
     （index -> 値）。空なら案内メッセージを返す。
     """
     if not entries:
@@ -955,14 +956,54 @@ def _rb_costume_rows(entries: list[dict], ranks=None, remains=None, targets=None
     ranks = ranks or {}
     remains = remains or {}
     targets = targets or {}
+    n = len(entries)
+    move_btn_style = {
+        "background": "none",
+        "border": "1px solid #ccc",
+        "borderRadius": "4px",
+        "cursor": "pointer",
+        "padding": "2px 8px",
+        "fontSize": "0.8rem",
+        "lineHeight": "1",
+    }
     rows = []
     for i, e in enumerate(entries):
         rows.append(
             html.Div(
                 [
+                    html.Span(
+                        f"{i + 1}.",
+                        title="優先順位（上の衣装ほど所持贈り物を優先的に充当）",
+                        style={
+                            "fontWeight": "bold",
+                            "color": "#888",
+                            "minWidth": "20px",
+                            "display": "inline-block",
+                        },
+                    ),
+                    html.Button(
+                        "▲",
+                        id={"type": "rb-move-up", "index": i},
+                        n_clicks=0,
+                        disabled=i == 0,
+                        title="優先順位を上げる",
+                        style=move_btn_style,
+                    ),
+                    html.Button(
+                        "▼",
+                        id={"type": "rb-move-down", "index": i},
+                        n_clicks=0,
+                        disabled=i == n - 1,
+                        title="優先順位を下げる",
+                        style=move_btn_style,
+                    ),
                     html.Strong(
                         e["label"],
-                        style={"minWidth": "140px", "display": "inline-block"},
+                        style={
+                            "minWidth": "140px",
+                            "display": "inline-block",
+                            "marginLeft": "4px",
+                        },
                     ),
                     html.Span("現在の絆ランク: ", style={"fontSize": "0.8rem"}),
                     dcc.Input(
@@ -1031,6 +1072,16 @@ def _rb_costume_rows(entries: list[dict], ranks=None, remains=None, targets=None
     return rows
 
 
+def _rb_swap_indices(by_index: dict[int, object], i: int, j: int) -> dict[int, object]:
+    """index i と j の値を入れ替える（未入力 = キーなし も入れ替える）。"""
+    out = {k: v for k, v in by_index.items() if k not in (i, j)}
+    if j in by_index:
+        out[i] = by_index[j]
+    if i in by_index:
+        out[j] = by_index[i]
+    return out
+
+
 def _rb_values_by_index(values, ids) -> dict[int, object]:
     """パターンマッチ入力を {index: 値} にまとめる（None は除外）。"""
     return {
@@ -1078,6 +1129,8 @@ def _rb_shift_indices(by_index: dict[int, object], removed: int) -> dict[int, ob
     Output("rb-gift-list", "children", allow_duplicate=True),
     Input("rb-add-costume-btn", "n_clicks"),
     Input({"type": "rb-remove-costume", "index": ALL}, "n_clicks"),
+    Input({"type": "rb-move-up", "index": ALL}, "n_clicks"),
+    Input({"type": "rb-move-down", "index": ALL}, "n_clicks"),
     State("rb-costume-dropdown", "value"),
     State("rb-costumes", "data"),
     State({"type": "rb-bond-rank", "index": ALL}, "value"),
@@ -1095,6 +1148,8 @@ def _rb_shift_indices(by_index: dict[int, object], removed: int) -> dict[int, ob
 def rb_update_costumes(
     add_clicks,
     remove_clicks,
+    move_up_clicks,
+    move_down_clicks,
     dropdown_value,
     entries,
     rank_values,
@@ -1108,10 +1163,11 @@ def rb_update_costumes(
     use_values,
     use_ids,
 ):
-    """生徒（衣装）の追加・削除。既存行の入力値は引き継ぐ。
+    """生徒（衣装）の追加・削除・並び替え（▲▼）。既存行の入力値は引き継ぐ。
 
-    贈り物リストは新しい衣装構成の好物に合わせて使用フラグの既定値を
-    更新して再構築する（所持数と、ユーザーが明示変更したフラグは保持）。
+    並び順がそのまま優先順位（上が最優先）。贈り物リストは新しい
+    衣装構成の好物に合わせて使用フラグの既定値を更新して再構築する
+    （所持数と、ユーザーが明示変更したフラグは保持）。
     """
     trigger = ctx.triggered_id
     entries = list(entries or [])
@@ -1186,6 +1242,31 @@ def rb_update_costumes(
             _rebuild_gift_list(old_entries),
         )
 
+    if isinstance(trigger, dict) and trigger.get("type") in (
+        "rb-move-up",
+        "rb-move-down",
+    ):
+        # 行の再生成直後にもボタン追加で発火するため、実クリックのみ処理
+        triggered_value = ctx.triggered[0]["value"] if ctx.triggered else None
+        if not triggered_value:
+            raise PreventUpdate
+        i = trigger["index"]
+        j = i - 1 if trigger["type"] == "rb-move-up" else i + 1
+        if not (0 <= i < len(entries) and 0 <= j < len(entries)):
+            raise PreventUpdate
+        entries[i], entries[j] = entries[j], entries[i]
+        return (
+            _rb_costume_rows(
+                entries,
+                _rb_swap_indices(ranks, i, j),
+                _rb_swap_indices(remains, i, j),
+                _rb_swap_indices(targets, i, j),
+            ),
+            entries,
+            "",
+            no_update,
+        )
+
     raise PreventUpdate
 
 
@@ -1238,6 +1319,8 @@ def rb_calculate(
     target_ranks = _gs_parse_current_ranks(
         target_values, target_ids, n, default=_RB_DEFAULT_TARGET_RANK
     )
+    # 並び順がそのまま優先順位（上の行 = 順位1 が最優先）
+    priorities = list(range(1, n + 1))
 
     # _gs_build_gift_inputs / _gs_box_values を流用するため、
     # 衣装リストと present を {表示名: {gift_id: tier}} 形式に揃える
@@ -1265,6 +1348,7 @@ def rb_calculate(
             box_values,
             target_ranks=target_ranks,
             remaining_exp=remaining_exp,
+            box_priorities=priorities,
         )
     except Exception as e:
         return html.Span(f"計算エラー: {e}", style={"color": "red"})

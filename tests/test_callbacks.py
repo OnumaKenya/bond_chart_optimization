@@ -9,6 +9,7 @@ from app.frontend.callbacks import (
     _rb_int_keys,
     _rb_merge_use_flags,
     _rb_shift_indices,
+    _rb_swap_indices,
     _rb_values_by_index,
 )
 
@@ -134,3 +135,33 @@ class TestRbCostumeRows:
         assert inputs[("rb-bond-rank", 1)].value == 33
         assert inputs[("rb-bond-remain", 1)].value == 100
         assert inputs[("rb-bond-target", 1)].value == 40
+
+    def test_move_buttons_disabled_at_ends(self):
+        rows = _rb_costume_rows(self.ENTRIES)
+        inputs = {
+            (c.id["type"], c.id["index"]): c
+            for row in rows
+            for c in row.children
+            if isinstance(getattr(c, "id", None), dict)
+        }
+        assert inputs[("rb-move-up", 0)].disabled is True
+        assert inputs[("rb-move-down", 0)].disabled is False
+        assert inputs[("rb-move-up", 1)].disabled is False
+        assert inputs[("rb-move-down", 1)].disabled is True
+
+
+class TestRbSwapIndices:
+    def test_swap_both_present(self):
+        assert _rb_swap_indices({0: "a", 1: "b", 2: "c"}, 0, 1) == {
+            0: "b",
+            1: "a",
+            2: "c",
+        }
+
+    def test_swap_with_missing_key(self):
+        # 未入力（キーなし）側も入れ替わる: 値が移動し、元は未入力になる
+        assert _rb_swap_indices({0: "a"}, 0, 1) == {1: "a"}
+        assert _rb_swap_indices({1: "b"}, 0, 1) == {0: "b"}
+
+    def test_swap_both_missing(self):
+        assert _rb_swap_indices({2: "c"}, 0, 1) == {2: "c"}
