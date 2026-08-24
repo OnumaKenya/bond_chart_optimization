@@ -20,13 +20,18 @@ from app.backend.user_presets import (
     load_gifts,
     gift_image_src,
     get_preset_present,
+    get_gift_lovers,
     parse_preset_value,
     VALID_PRESENT_TIERS,
 )
 from app.backend.gift_exp import (
+    get_effectivity,
     gift_exp,
     gift_select_box_exp,
+    tier_to_effectivity,
     GIFT_SELECT_BOX_ID,
+    TIER_ICON,
+    TIER_LABEL,
 )
 from app.backend.gift_solver import (
     solve_gift_distribution,
@@ -43,6 +48,9 @@ from app.frontend.layout import (
     create_layout,
     build_gs_gift_list,
     gs_default_used,
+    gl_gift_class,
+    gl_lookup_gifts,
+    GL_TIER_ORDER,
 )
 
 
@@ -236,18 +244,9 @@ def _gs_costume_rows(
     return rows
 
 
-# present.tier -> リアクションアイコン (assets/reaction/<name>.png)。
-# admin._TIER_ICON と同じ対応。
-_GS_TIER_ICON = {
-    "favorite": "favorite",
-    "superFavorite": "super",
-    "ultraFavorite": "ultra",
-}
-_GS_TIER_LABELS = {
-    "favorite": "中",
-    "superFavorite": "大",
-    "ultraFavorite": "特大",
-}
+# present.tier -> リアクションアイコン / 効果ラベル（gift_exp の共有マップ）。
+_GS_TIER_ICON = TIER_ICON
+_GS_TIER_LABELS = TIER_LABEL
 
 
 def _gs_present_table(costumes: list[dict], present: dict, gifts: list[dict]):
@@ -2115,3 +2114,128 @@ def submit_preset(
         ),
         {"submitted": True},
     )
+
+
+# ======================================================================
+# 贈り物逆引きページ
+# ======================================================================
+
+
+def _gl_header(gift: dict) -> html.Div:
+    """結果先頭の「選択中の贈り物」行。"""
+    is_high = gift["gift_type"] in ("high", "high-all")
+    return html.Div(
+        [
+            html.Img(
+                src=gift_image_src(gift),
+                style={"width": "44px", "height": "34px", "objectFit": "contain"},
+            ),
+            html.Strong(gift["name"], style={"fontSize": "1.05rem"}),
+            html.Span(
+                "高級" if is_high else "通常",
+                style={
+                    "fontSize": "0.75rem",
+                    "color": "#666",
+                    "border": "1px solid #ccc",
+                    "borderRadius": "10px",
+                    "padding": "1px 8px",
+                    "background": "#ede7f6" if is_high else "#fafafa",
+                },
+            ),
+        ],
+        style={
+            "display": "flex",
+            "alignItems": "center",
+            "gap": "8px",
+            "flexWrap": "wrap",
+            "paddingBottom": "8px",
+            "borderBottom": "1px solid #eee",
+        },
+    )
+
+
+def _gl_note(text: str) -> html.P:
+    return html.P(
+        text, style={"color": "#666", "fontSize": "0.9rem", "margin": "10px 0 0"}
+    )
+
+
+def _gl_tier_section(gift: dict, tier: str, members: list[dict]) -> html.Div:
+    """効果ごとの生徒（衣装）一覧。"""
+    label, exp = get_effectivity(gift["gift_type"], tier_to_effectivity(tier))
+    return html.Div(
+        [
+            html.Div(
+                [
+                    html.Img(
+                        src=f"/assets/reaction/{_GS_TIER_ICON[tier]}.png",
+                        alt=label,
+                        title=label,
+                        style={"height": "24px", "verticalAlign": "middle"},
+                    ),
+                    html.Strong(f"{label}（{exp} EXP）"),
+                    html.Span(
+                        f"{len(members)}人",
+                        style={"fontSize": "0.8rem", "color": "#888"},
+                    ),
+                ],
+                style={"display": "flex", "alignItems": "center", "gap": "8px"},
+            ),
+            html.Div(
+                [html.Span(m["label"], className="gl-chip") for m in members],
+                className="gl-chips",
+            ),
+        ],
+        style={"marginTop": "14px"},
+    )
+
+
+def _gl_result(gift: dict | None) -> list:
+    """選択された贈り物の逆引き結果を組み立てる。"""
+    if gift is None:
+        return [
+            html.P(
+                "贈り物が見つかりませんでした。",
+                style={"color": "#888", "margin": "8px 0"},
+            )
+        ]
+    children = [_gl_header(gift)]
+    lovers = get_gift_lovers(gift["id"])
+    if not lovers:
+        children.append(
+            _gl_note("この贈り物を好物にしている生徒（衣装）は登録されていません。")
+        )
+        return children
+    by_tier: dict[str, list[dict]] = {}
+    for lover in lovers:
+        by_tier.setdefault(lover["tier"], []).append(lover)
+    children.append(_gl_note(f"好物にしている生徒（衣装）: {len(lovers)}人"))
+    for tier in GL_TIER_ORDER:
+        members = by_tier.get(tier)
+        if members:
+            children.append(_gl_tier_section(gift, tier, members))
+    return children
+
+
+@callback(
+    Output("gl-result", "children"),
+    Output({"type": "gl-gift", "gift": ALL}, "className"),
+    Input({"type": "gl-gift", "gift": ALL}, "n_clicks"),
+    State({"type": "gl-gift", "gift": ALL}, "id"),
+    prevent_initial_call=True,
+)
+def gl_select_gift(_clicks, ids):
+    """贈り物カードのクリックで逆引き結果を表示し、選択中カードを強調する。"""
+    triggered = ctx.triggered_id
+    if not triggered:
+        raise PreventUpdate
+    selected_id = triggered["gift"]
+    gifts = {g["id"]: g for g in gl_lookup_gifts()}
+    classes = [
+        gl_gift_class(
+            gifts.get(i["gift"], {"gift_type": "normal"}),
+            i["gift"] == selected_id,
+        )
+        for i in ids
+    ]
+    return _gl_result(gifts.get(selected_id)), classes

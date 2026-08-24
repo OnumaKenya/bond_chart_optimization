@@ -897,6 +897,80 @@ def gift_image_src(gift: dict) -> str:
     return f"/assets/gift/{quote(gift['name'])}.png"
 
 
+# ----------------------------------------------------------------------
+# 贈り物 → 好物にしている衣装 の逆引き
+# ----------------------------------------------------------------------
+
+
+def _load_gift_lovers(gift_id: str) -> list[dict]:
+    try:
+        conn = _get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT c.student_name, c.costume_name, p.tier "
+                "FROM present p "
+                "JOIN costume c ON c.id = p.costume_id "
+                "LEFT JOIN student_priority sp "
+                "  ON sp.student_name = c.student_name "
+                "WHERE p.gift_id = %s "
+                "ORDER BY COALESCE(sp.priority, 1000000), c.student_name, "
+                "c.sort_order, c.id",
+                (gift_id,),
+            )
+            rows = cur.fetchall()
+    except Exception:
+        _logger.exception("DB read error")
+        return []
+    return [
+        {
+            "student_name": r[0],
+            "costume_name": r[1],
+            "label": _costume_label(r[0], r[1]),
+            "tier": r[2],
+        }
+        for r in rows
+    ]
+
+
+def get_gift_lovers(gift_id: str) -> list[dict]:
+    """指定の贈り物を好物にしている衣装を返す（短時間キャッシュ）。
+
+    [{student_name, costume_name, label, tier}, ...] を
+    優先度 (student_priority) 順 → 生徒名順 → 衣装の定義順で返す。
+    全生徒対象タイプ (*-all) は present に行を持たないため空リスト。
+    """
+    if not _DATABASE_URL or not gift_id:
+        return []
+    return _cached_options(f"gift_lovers:{gift_id}", lambda: _load_gift_lovers(gift_id))
+
+
+def _load_gift_lover_counts() -> dict[str, dict[str, int]]:
+    try:
+        conn = _get_conn()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT gift_id, tier, COUNT(*) FROM present GROUP BY gift_id, tier"
+            )
+            out: dict[str, dict[str, int]] = {}
+            for gift_id, tier, n in cur.fetchall():
+                out.setdefault(gift_id, {})[tier] = n
+            return out
+    except Exception:
+        _logger.exception("DB read error")
+        return {}
+
+
+def get_gift_lover_counts() -> dict[str, dict[str, int]]:
+    """{gift_id: {tier: 好物にしている衣装数}} を返す（短時間キャッシュ）。
+
+    present に行が無い贈り物（全生徒対象タイプ等）はキーを持たない。
+    0 件の tier もキーを持たないため、参照側は .get(tier, 0) を使う。
+    """
+    if not _DATABASE_URL:
+        return {}
+    return _cached_options("gift_lover_counts", _load_gift_lover_counts)
+
+
 def get_preset_present(
     student_name: str, status_name: str
 ) -> dict[str, dict[str, str]]:

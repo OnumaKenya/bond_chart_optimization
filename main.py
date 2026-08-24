@@ -85,6 +85,24 @@ application.clientside_callback(
     State({"type": "page-tab", "path": ALL}, "id"),
 )
 
+# --- 贈り物逆引き: 名前による絞り込み ---
+application.clientside_callback(
+    """
+    function(query, index, ids) {
+        const q = (query || '').trim().toLowerCase();
+        if (!q) return ids.map(() => ({}));
+        return ids.map(function (id) {
+            const s = ((index && index[id.gift]) || '').toLowerCase();
+            return s.indexOf(q) >= 0 ? {} : {display: 'none'};
+        });
+    }
+    """,
+    Output({"type": "gl-gift", "gift": ALL}, "style"),
+    Input("gl-search", "value"),
+    State("gl-search-index", "data"),
+    State({"type": "gl-gift", "gift": ALL}, "id"),
+)
+
 # --- マニュアルモーダル開閉 ---
 application.clientside_callback(
     """
