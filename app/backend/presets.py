@@ -19,6 +19,14 @@ _PRESETS_PATH = _BASE_DIR / "data" / "presets.json"
 
 
 def _load_presets() -> dict[str, list[dict]]:
+    """data/presets.json を読み込む。
+
+    data/ は .gitignore 対象のローカル専用ディレクトリのため、
+    CI などファイルが無い環境では空辞書を返す。アプリのプリセットは
+    DB (user_presets) 側で管理しており、ここは検証用データの入口。
+    """
+    if not _PRESETS_PATH.exists():
+        return {}
     with open(_PRESETS_PATH, encoding="utf-8") as f:
         return json.load(f)
 
