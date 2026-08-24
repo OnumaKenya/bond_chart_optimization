@@ -103,6 +103,99 @@ input[type="number"] {
     gap: 8px !important;
 }
 
+/* ── 贈り物逆引きページ ── */
+.gl-columns {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+}
+.gl-select-col {
+    flex: 1;
+    min-width: 0;
+}
+/* 結果カラム: スクロールしても選択部と並んで見えるよう追従させる */
+.gl-result-col {
+    width: 380px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 16px;
+    align-self: flex-start;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+}
+.gl-gift-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+    gap: 6px;
+}
+.gl-gift-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 6px 4px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: center;
+    transition: border-color 0.12s, box-shadow 0.12s;
+}
+.gl-gift-card:hover {
+    border-color: #4a90d9;
+}
+.gl-gift-card.gl-selected {
+    border-color: #4a90d9;
+    box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.35);
+}
+.gl-high {
+    background: #ede7f6;
+}
+.gl-normal {
+    background: #fafafa;
+}
+.gl-gift-name {
+    font-size: 0.7rem;
+    line-height: 1.2;
+    color: #333;
+    word-break: break-word;
+}
+.gl-tier-counts {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 2px;
+    font-size: 0.66rem;
+    color: #555;
+    line-height: 1.3;
+}
+/* 1つの「特大3人」が途中で折り返さないようにし、区切りの / で改行させる */
+.gl-tier-count {
+    white-space: nowrap;
+}
+.gl-tier-sep {
+    color: #bbb;
+}
+.gl-legend {
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    padding: 1px 8px;
+}
+.gl-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+.gl-chip {
+    font-size: 0.8rem;
+    background: #f0f4f8;
+    border: 1px solid #dde4ea;
+    border-radius: 12px;
+    padding: 2px 10px;
+    white-space: nowrap;
+}
+
 /* ── モバイル対応 ── */
 @media (max-width: 768px) {
     /* 2カラム → 縦積み */
@@ -261,6 +354,25 @@ input[type="number"] {
         max-height: 90vh !important;
         padding: 16px !important;
         border-radius: 8px !important;
+    }
+
+    /* 贈り物逆引き: 2カラム → 縦積み、カードを詰める */
+    .gl-columns {
+        flex-direction: column !important;
+        gap: 12px !important;
+    }
+    .gl-select-col,
+    .gl-result-col {
+        width: 100% !important;
+        position: static !important;
+        max-height: none !important;
+        overflow-y: visible !important;
+    }
+    .gl-gift-grid {
+        grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)) !important;
+    }
+    .gl-gift-card {
+        min-height: 0 !important;
     }
 
     /* 削除ボタン: タップしやすく */

@@ -16,6 +16,22 @@ _TIER_TO_EFFECTIVITY = {
 }
 
 
+# present.tier -> リアクションアイコン名 (assets/reaction/<name>.png)。
+TIER_ICON = {
+    "favorite": "favorite",
+    "superFavorite": "super",
+    "ultraFavorite": "ultra",
+}
+
+# present.tier -> 効果ラベル。normal / high のどちらでも同じ対応になる
+# （get_effectivity 参照。獲得EXPだけが gift_type で変わる）。
+TIER_LABEL = {
+    "favorite": "中",
+    "superFavorite": "大",
+    "ultraFavorite": "特大",
+}
+
+
 def tier_to_effectivity(tier: str | None) -> str:
     """present.tier を effectivity に変換する。
 

@@ -4,8 +4,16 @@ from pathlib import Path
 from dash import html, dcc
 
 from app.backend.student import BOND_RANGES
+from app.backend.gift_exp import (
+    get_effectivity,
+    tier_to_effectivity,
+    GIFT_SELECT_BOX_ID,
+    TIER_LABEL,
+)
 from app.backend.user_presets import (
+    _search_text,
     get_costume_options,
+    get_gift_lover_counts,
     get_student_options,
     gift_image_src,
     load_gifts,
@@ -1269,6 +1277,201 @@ def create_required_exp_layout() -> html.Div:
 
 
 # ======================================================================
+# 贈り物逆引きページ
+# ======================================================================
+
+# 効果の高い順。結果の表示順に使う。
+GL_TIER_ORDER = ("ultraFavorite", "superFavorite", "favorite")
+
+
+def gl_lookup_gifts() -> list[dict]:
+    """逆引き対象の贈り物を返す。
+
+    全生徒対象タイプ (*-all) と贈り物選択ボックスは衣装ごとの好みを
+    持たない（誰に贈っても効果が同じ / 中身を選べる）ため除外する。
+    """
+    return [
+        g
+        for g in load_gifts()
+        if not g["gift_type"].endswith("-all") and g["id"] != GIFT_SELECT_BOX_ID
+    ]
+
+
+def gl_gift_class(gift: dict, selected: bool = False) -> str:
+    """贈り物カードの className。高級/通常で背景色、選択中で枠を変える。"""
+    base = "gl-gift-card "
+    base += "gl-high" if gift["gift_type"] in ("high", "high-all") else "gl-normal"
+    return base + " gl-selected" if selected else base
+
+
+def _gl_tier_counts(gift: dict, counts: dict[str, int]) -> html.Div:
+    """効果別の人数表示（特大x人/大x人/中x人）。0 人の効果は表示しない。"""
+    badges = []
+    for tier in GL_TIER_ORDER:
+        n = counts.get(tier, 0)
+        if not n:
+            continue
+        label, exp = get_effectivity(gift["gift_type"], tier_to_effectivity(tier))
+        if badges:
+            badges.append(html.Span("/", className="gl-tier-sep"))
+        badges.append(
+            html.Span(
+                f"{label}{n}人",
+                className="gl-tier-count",
+                title=f"{label}（{exp} EXP）{n}人",
+            )
+        )
+    if not badges:
+        badges = [html.Span("－", className="gl-tier-count")]
+    return html.Div(badges, className="gl-tier-counts")
+
+
+def _gl_card_title(gift: dict, counts: dict[str, int]) -> str:
+    """カードのツールチップ。贈り物名と効果別の内訳を出す。"""
+    total = sum(counts.values())
+    if not total:
+        return f"{gift['name']}（好物にしている生徒なし）"
+    parts = [f"{TIER_LABEL[t]} {counts[t]}人" for t in GL_TIER_ORDER if counts.get(t)]
+    return f"{gift['name']}（計 {total}人: {' / '.join(parts)}）"
+
+
+def _gl_gift_card(gift: dict, counts: dict[str, int]) -> html.Button:
+    """贈り物1件のカード（アイコン・名前・効果別の人数）。"""
+    return html.Button(
+        [
+            html.Img(
+                src=gift_image_src(gift),
+                style={"width": "44px", "height": "34px", "objectFit": "contain"},
+            ),
+            html.Div(gift["name"], className="gl-gift-name"),
+            _gl_tier_counts(gift, counts),
+        ],
+        id={"type": "gl-gift", "gift": gift["id"]},
+        n_clicks=0,
+        className=gl_gift_class(gift),
+        title=_gl_card_title(gift, counts),
+    )
+
+
+def create_gift_lookup_layout() -> html.Div:
+    """贈り物逆引きページ。
+
+    左に贈り物リスト、右にその贈り物を好物にしている生徒（衣装）を
+    効果別に表示する2カラム構成。結果カラムはスクロールに追従する。
+    """
+    gifts = gl_lookup_gifts()
+    if not gifts:
+        return html.Div(
+            [
+                html.P(
+                    "贈り物データを読み込めませんでした。",
+                    style={"color": "#888"},
+                ),
+                _footer(),
+            ],
+            className="page-container",
+            style={"maxWidth": "1200px", "margin": "0 auto", "padding": "20px"},
+        )
+    counts = get_gift_lover_counts()
+    panel_style = {
+        "padding": "12px",
+        "border": "1px solid #ccc",
+        "borderRadius": "8px",
+    }
+    return html.Div(
+        [
+            html.P(
+                "贈り物を選ぶと、それを好物にしている生徒（衣装）を"
+                "効果（特大 / 大 / 中）別に一覧します。好物は衣装ごとに"
+                "異なるため、同じ生徒でも衣装によって効果が変わります。"
+                "カード下部の数字は、その贈り物を好物にしている生徒（衣装）の"
+                "人数を効果別に示したものです。",
+                style={"fontSize": "0.85rem", "color": "#666", "margin": "0 0 12px"},
+            ),
+            html.Div(
+                [
+                    # 左カラム: 贈り物の選択
+                    html.Div(
+                        html.Div(
+                            [
+                                html.Div(
+                                    [
+                                        html.Strong("贈り物を選択"),
+                                        html.Span(
+                                            "高級", className="gl-legend gl-high"
+                                        ),
+                                        html.Span(
+                                            "通常", className="gl-legend gl-normal"
+                                        ),
+                                        dcc.Input(
+                                            id="gl-search",
+                                            type="text",
+                                            placeholder="贈り物名で絞り込み...",
+                                            value="",
+                                            style={
+                                                "marginLeft": "auto",
+                                                "width": "200px",
+                                                "maxWidth": "45%",
+                                                "padding": "4px 8px",
+                                            },
+                                        ),
+                                    ],
+                                    style={
+                                        "display": "flex",
+                                        "alignItems": "center",
+                                        "gap": "6px",
+                                        "flexWrap": "wrap",
+                                        "marginBottom": "8px",
+                                        "fontSize": "0.75rem",
+                                        "color": "#666",
+                                    },
+                                ),
+                                html.Div(
+                                    [
+                                        _gl_gift_card(g, counts.get(g["id"], {}))
+                                        for g in gifts
+                                    ],
+                                    id="gl-gift-grid",
+                                    className="gl-gift-grid",
+                                ),
+                            ],
+                            style=panel_style,
+                        ),
+                        className="gl-select-col",
+                    ),
+                    # 右カラム: 逆引き結果（スクロール追従）
+                    html.Div(
+                        html.Div(
+                            id="gl-result",
+                            children=html.P(
+                                "贈り物を選んでください。",
+                                style={"color": "#888", "margin": "8px 0"},
+                            ),
+                            style=panel_style,
+                        ),
+                        className="gl-result-col",
+                    ),
+                ],
+                className="gl-columns",
+            ),
+            # 絞り込み用の検索テキスト {gift_id: 検索文字列}
+            dcc.Store(
+                id="gl-search-index",
+                data={g["id"]: _search_text(g["name"]) for g in gifts},
+            ),
+            _footer(),
+        ],
+        className="page-container",
+        style={
+            "maxWidth": "1200px",
+            "margin": "0 auto",
+            "padding": "20px",
+            "fontFamily": "sans-serif",
+        },
+    )
+
+
+# ======================================================================
 # ルートレイアウト（URL ルーティング）
 # ======================================================================
 
@@ -1277,6 +1480,7 @@ PAGES = {
     "/chart-opt": ("絆上げ優先度計算機", create_layout),
     "/gift-simulation": ("贈り物配分シミュレータ", create_gift_simulator_layout),
     "/required-exp": ("必要絆経験値", create_required_exp_layout),
+    "/gift-lookup": ("贈り物逆引き", create_gift_lookup_layout),
 }
 
 # 主要ページ以外のページ（フッター等からのみアクセス）。
