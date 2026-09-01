@@ -5,12 +5,14 @@
 
 from app.frontend.callbacks import (
     _gift_inputs_to_maps,
+    _gs_costume_rows,
+    _gs_normalize_order,
     _rb_costume_rows,
     _rb_int_keys,
     _rb_merge_use_flags,
     _rb_shift_indices,
     _rb_swap_indices,
-    _rb_values_by_index,
+    _values_by_index,
 )
 
 
@@ -74,10 +76,10 @@ class TestRbValuesByIndex:
     def test_maps_by_index(self):
         values = [10, None, 30]
         ids = [{"index": 0}, {"index": 1}, {"index": 2}]
-        assert _rb_values_by_index(values, ids) == {0: 10, 2: 30}
+        assert _values_by_index(values, ids) == {0: 10, 2: 30}
 
     def test_empty(self):
-        assert _rb_values_by_index([], []) == {}
+        assert _values_by_index([], []) == {}
 
 
 class TestRbShiftIndices:
@@ -165,3 +167,83 @@ class TestRbSwapIndices:
 
     def test_swap_both_missing(self):
         assert _rb_swap_indices({2: "c"}, 0, 1) == {2: "c"}
+
+
+class TestGsNormalizeOrder:
+    def test_default_is_original_order(self):
+        assert _gs_normalize_order(None, 3) == [0, 1, 2]
+        assert _gs_normalize_order([], 3) == [0, 1, 2]
+
+    def test_keeps_given_order(self):
+        assert _gs_normalize_order([2, 0, 1], 3) == [2, 0, 1]
+
+    def test_missing_indices_appended(self):
+        assert _gs_normalize_order([2], 3) == [2, 0, 1]
+
+    def test_drops_duplicates_and_out_of_range(self):
+        assert _gs_normalize_order([1, 1, 9, -1, "x", None], 2) == [1, 0]
+
+    def test_str_values(self):
+        # localStorage 経由で文字列になっていても解釈する
+        assert _gs_normalize_order(["1", "0"], 2) == [1, 0]
+
+    def test_shrunk_costume_list(self):
+        # 衣装数が減ったプリセットに保存済みの並びを当てても壊れない
+        assert _gs_normalize_order([0, 1, 2], 2) == [0, 1]
+
+
+class TestGsCostumeRows:
+    COSTUMES = [
+        {"costume_name": "通常", "bond_bonuses": [1, 0, 0, 0, 0, 0, 0]},
+        {"costume_name": "水着", "bond_bonuses": [2, 0, 0, 0, 0, 0, 0]},
+    ]
+
+    @staticmethod
+    def _components(rows):
+        """行（入れ子あり）から id 付きコンポーネントを集める。"""
+        found = {}
+
+        def walk(node):
+            if isinstance(node, (list, tuple)):
+                for c in node:
+                    walk(c)
+                return
+            cid = getattr(node, "id", None)
+            if isinstance(cid, dict):
+                found[(cid["type"], cid["index"])] = node
+            walk(getattr(node, "children", None) or [])
+
+        walk(rows)
+        return found
+
+    def test_row_count(self):
+        assert len(_gs_costume_rows(self.COSTUMES)) == 2
+
+    def test_move_buttons_disabled_at_ends(self):
+        comps = self._components(_gs_costume_rows(self.COSTUMES))
+        assert comps[("gs-move-up", 0)].disabled is True
+        assert comps[("gs-move-down", 0)].disabled is False
+        assert comps[("gs-move-up", 1)].disabled is False
+        assert comps[("gs-move-down", 1)].disabled is True
+
+    def test_order_changes_display_not_indices(self):
+        rows = _gs_costume_rows(self.COSTUMES, order=[1, 0])
+        # 表示順は order どおり
+        assert rows[0].children[3].children == "水着"
+        assert rows[1].children[3].children == "通常"
+        # 入力の index は衣装 index のまま。端のボタンだけが無効になる
+        comps = self._components(rows)
+        assert comps[("gs-move-up", 1)].disabled is True
+        assert comps[("gs-move-down", 0)].disabled is True
+
+    def test_value_carryover_follows_costume_index(self):
+        rows = _gs_costume_rows(
+            self.COSTUMES,
+            rank_by_index={1: 33},
+            remain_by_index={"1": 100},
+            order=[1, 0],
+        )
+        comps = self._components(rows)
+        assert comps[("gs-bond-rank", 1)].value == 33
+        assert comps[("gs-bond-remain", 1)].value == 100
+        assert comps[("gs-bond-rank", 0)].value == 20

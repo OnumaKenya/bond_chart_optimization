@@ -1007,7 +1007,18 @@ def create_gift_simulator_layout() -> html.Div:
             # 衣装・上昇量（表示のみ）＋ 現在の絆ランク入力
             html.Div(
                 [
-                    html.Strong("衣装 / 現在の絆ランク / 絆ボーナス"),
+                    html.Strong("衣装 / 優先順位 / 現在の絆ランク / 絆ボーナス"),
+                    html.P(
+                        "▲▼ の並び順が優先順位です（上が最優先）。"
+                        "絆ボーナス合計・使用個数が同点のとき、"
+                        "上の衣装ほど絆ランクが高くなる配分を選びます"
+                        "（もらえる絆ボーナスや使う贈り物の数は変わりません）。",
+                        style={
+                            "color": "#888",
+                            "fontSize": "0.8rem",
+                            "margin": "4px 0 0",
+                        },
+                    ),
                     html.Div(
                         id="gs-costume-display",
                         children=html.P(
@@ -1088,6 +1099,8 @@ def create_gift_simulator_layout() -> html.Div:
                 style={"marginTop": "16px"},
             ),
             dcc.Store(id="gs-loaded-preset"),
+            # 衣装の優先順位（衣装 index の並び。先頭が最優先）
+            dcc.Store(id="gs-costume-order", data=[]),
             dcc.Store(id="gs-autosave", storage_type="local"),
             # 復元完了フラグ: False の間は gs-autosave への保存をブロックする
             dcc.Store(id="gs-autosave-ready", data=False),

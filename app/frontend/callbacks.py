@@ -157,20 +157,54 @@ def gs_update_status_radio(dropdown_value, autosave_data):
 # ----------------------------------------------------------------------
 
 
+# 並び替え（▲▼）ボタンの共通スタイル
+_MOVE_BTN_STYLE = {
+    "background": "none",
+    "border": "1px solid #ccc",
+    "borderRadius": "4px",
+    "cursor": "pointer",
+    "padding": "2px 8px",
+    "fontSize": "0.8rem",
+    "lineHeight": "1",
+}
+
+
+def _gs_normalize_order(order, n: int) -> list[int]:
+    """優先順位（衣装 index の並び）を正規化する。
+
+    不正値・重複を落とし、欠けている衣装は元の順序で末尾に足す。
+    """
+    seen = []
+    for v in order or []:
+        try:
+            i = int(v)
+        except (TypeError, ValueError):
+            continue
+        if 0 <= i < n and i not in seen:
+            seen.append(i)
+    seen.extend(i for i in range(n) if i not in seen)
+    return seen
+
+
 def _gs_costume_rows(
     costumes: list[dict],
     rank_by_index=None,
     remain_by_index=None,
+    order=None,
 ) -> list:
-    """衣装ごとに 衣装名 / 絆ボーナス(表示のみ) / 現在の絆ランク入力 /
-    次の絆上昇までの残り経験値(任意) を生成。
+    """衣装ごとに 優先順位(▲▼) / 衣装名 / 絆ボーナス(表示のみ) /
+    現在の絆ランク入力 / 次の絆上昇までの残り経験値(任意) を生成。
 
-    rank_by_index / remain_by_index が与えられた場合は保存値で上書きする。
+    order は衣装 index の並び（先頭が最優先）。表示順がそのまま優先順位で、
+    同点時のタイブレークに使う。rank_by_index / remain_by_index が与えられた
+    場合は保存値で上書きする（キーは衣装 index で、並び替えても不変）。
     """
     rank_by_index = rank_by_index or {}
     remain_by_index = remain_by_index or {}
+    order = _gs_normalize_order(order, len(costumes))
     rows = []
-    for i, c in enumerate(costumes):
+    for pos, i in enumerate(order):
+        c = costumes[i]
         rank_val = rank_by_index.get(i, rank_by_index.get(str(i), 20))
         remain_val = remain_by_index.get(i, remain_by_index.get(str(i), None))
         bonus_cells = [
@@ -188,6 +222,35 @@ def _gs_costume_rows(
         rows.append(
             html.Div(
                 [
+                    html.Span(
+                        f"{pos + 1}.",
+                        title=(
+                            "優先順位（絆ボーナス合計が同点のとき、"
+                            "上の衣装ほど絆ランクが高くなる配分を選ぶ）"
+                        ),
+                        style={
+                            "fontWeight": "bold",
+                            "color": "#888",
+                            "minWidth": "20px",
+                            "display": "inline-block",
+                        },
+                    ),
+                    html.Button(
+                        "▲",
+                        id={"type": "gs-move-up", "index": i},
+                        n_clicks=0,
+                        disabled=pos == 0,
+                        title="優先順位を上げる",
+                        style=_MOVE_BTN_STYLE,
+                    ),
+                    html.Button(
+                        "▼",
+                        id={"type": "gs-move-down", "index": i},
+                        n_clicks=0,
+                        disabled=pos == len(order) - 1,
+                        title="優先順位を下げる",
+                        style=_MOVE_BTN_STYLE,
+                    ),
                     html.Strong(
                         c["costume_name"],
                         style={"minWidth": "70px", "display": "inline-block"},
@@ -319,12 +382,16 @@ def _preset_present_children(preset_value, costumes: list[dict]):
     return _gs_present_table(costumes, get_preset_present(*parsed), load_gifts())
 
 
-def _gs_build_view(preset_value, ranks=None, qty=None, use=None, remain=None):
+def _gs_build_view(
+    preset_value, ranks=None, qty=None, use=None, remain=None, order=None
+):
     """プリセットから 衣装表示 / 好物表 / フィードバック / loaded-store /
-    贈り物リスト を構築する。ranks/qty/use/remain は保存値の上書き（復元用）。
+    贈り物リスト / 優先順位 を構築する。ranks/qty/use/remain/order は
+    保存値の上書き（復元用）。
 
     Returns (costume_children, present_children, feedback, store_data,
-    gift_list_children) または失敗時 (None, None, error_span, None, None)。
+    gift_list_children, order) または失敗時
+    (None, None, error_span, None, None, None)。
     """
     result = get_preset_data(preset_value)
     parsed = parse_preset_value(preset_value)
@@ -333,6 +400,7 @@ def _gs_build_view(preset_value, ranks=None, qty=None, use=None, remain=None):
             None,
             None,
             html.Span("プリセットが見つかりません。", style={"color": "red"}),
+            None,
             None,
             None,
         )
@@ -352,8 +420,11 @@ def _gs_build_view(preset_value, ranks=None, qty=None, use=None, remain=None):
     feedback = html.Span(
         f"「{display_name}」を読み込みました。", style={"color": "#27ae60"}
     )
+    order = _gs_normalize_order(order, len(costumes))
     return (
-        _gs_costume_rows(costumes, rank_by_index=ranks, remain_by_index=remain),
+        _gs_costume_rows(
+            costumes, rank_by_index=ranks, remain_by_index=remain, order=order
+        ),
         present_children,
         feedback,
         {
@@ -362,6 +433,7 @@ def _gs_build_view(preset_value, ranks=None, qty=None, use=None, remain=None):
             "costumes": costumes,
         },
         gift_list_children,
+        order,
     )
 
 
@@ -371,6 +443,7 @@ def _gs_build_view(preset_value, ranks=None, qty=None, use=None, remain=None):
     Output("gs-load-feedback", "children"),
     Output("gs-loaded-preset", "data"),
     Output("gs-gift-list", "children"),
+    Output("gs-costume-order", "data"),
     Input("gs-load-preset-btn", "n_clicks"),
     State("gs-preset-dropdown", "value"),
     State("gs-status-radio", "value"),
@@ -385,6 +458,7 @@ def gs_load_preset(n_clicks, dropdown_value, status_value):
             html.Span("プリセットを選択してください。", style={"color": "red"}),
             no_update,
             no_update,
+            no_update,
         )
     (
         costume_children,
@@ -392,10 +466,11 @@ def gs_load_preset(n_clicks, dropdown_value, status_value):
         feedback,
         store,
         gift_list,
+        order,
     ) = _gs_build_view(preset_value)
     if store is None:
-        return (no_update, no_update, feedback, no_update, no_update)
-    return (costume_children, present_children, feedback, store, gift_list)
+        return (no_update, no_update, feedback, no_update, no_update, no_update)
+    return (costume_children, present_children, feedback, store, gift_list, order)
 
 
 # ----------------------------------------------------------------------
@@ -425,6 +500,7 @@ def _gift_inputs_to_maps(qty_values, qty_ids, use_values, use_ids):
     Input({"type": "gs-bond-remain", "index": ALL}, "value"),
     Input({"type": "gs-gift-qty", "gift": ALL}, "value"),
     Input({"type": "gs-gift-use", "gift": ALL}, "value"),
+    Input("gs-costume-order", "data"),
     State({"type": "gs-bond-rank", "index": ALL}, "id"),
     State({"type": "gs-bond-remain", "index": ALL}, "id"),
     State({"type": "gs-gift-qty", "gift": ALL}, "id"),
@@ -439,6 +515,7 @@ def gs_save_autosave(
     remain_values,
     qty_values,
     use_values,
+    order,
     rank_ids,
     remain_ids,
     qty_ids,
@@ -466,6 +543,7 @@ def gs_save_autosave(
         "remain": remain,
         "qty": qty,
         "use": use,
+        "order": list(order or []),
     }
 
 
@@ -476,6 +554,7 @@ def gs_save_autosave(
     Output("gs-load-feedback", "children", allow_duplicate=True),
     Output("gs-loaded-preset", "data", allow_duplicate=True),
     Output("gs-gift-list", "children", allow_duplicate=True),
+    Output("gs-costume-order", "data", allow_duplicate=True),
     Output("gs-autosave-ready", "data"),
     Input("gs-autosave-init", "n_intervals"),
     State("gs-autosave", "data"),
@@ -484,12 +563,13 @@ def gs_save_autosave(
 def gs_restore_autosave(_n, data):
     # 復元するものがなくても ready フラグは立てる（以降の保存を許可）
     if not data:
-        return (no_update,) * 6 + (True,)
+        return (no_update,) * 7 + (True,)
     preset_value = data.get("preset_value")
     qty = data.get("qty") or {}
     use = data.get("use") or {}
     ranks = data.get("ranks") or {}
     remain = data.get("remain") or {}
+    saved_order = data.get("order") or []
 
     if not preset_value:
         # プリセット未選択でも所持数・使用フラグは復元する
@@ -507,6 +587,7 @@ def gs_restore_autosave(_n, data):
             no_update,
             no_update,
             gift_list,
+            no_update,
             True,
         )
 
@@ -516,9 +597,17 @@ def gs_restore_autosave(_n, data):
         feedback,
         store,
         gift_list,
-    ) = _gs_build_view(preset_value, ranks=ranks, qty=qty, use=use, remain=remain)
+        order,
+    ) = _gs_build_view(
+        preset_value,
+        ranks=ranks,
+        qty=qty,
+        use=use,
+        remain=remain,
+        order=saved_order,
+    )
     if store is None:
-        return (no_update,) * 6 + (True,)
+        return (no_update,) * 7 + (True,)
     return (
         _dropdown_student(preset_value),
         costume_children,
@@ -526,7 +615,62 @@ def gs_restore_autosave(_n, data):
         feedback,
         store,
         gift_list,
+        order,
         True,
+    )
+
+
+@callback(
+    Output("gs-costume-display", "children", allow_duplicate=True),
+    Output("gs-costume-order", "data", allow_duplicate=True),
+    Input({"type": "gs-move-up", "index": ALL}, "n_clicks"),
+    Input({"type": "gs-move-down", "index": ALL}, "n_clicks"),
+    State("gs-loaded-preset", "data"),
+    State("gs-costume-order", "data"),
+    State({"type": "gs-bond-rank", "index": ALL}, "value"),
+    State({"type": "gs-bond-rank", "index": ALL}, "id"),
+    State({"type": "gs-bond-remain", "index": ALL}, "value"),
+    State({"type": "gs-bond-remain", "index": ALL}, "id"),
+    prevent_initial_call=True,
+)
+def gs_reorder_costumes(
+    up_clicks,
+    down_clicks,
+    loaded,
+    order,
+    rank_values,
+    rank_ids,
+    remain_values,
+    remain_ids,
+):
+    """▲▼ で衣装の優先順位（同点時のタイブレーク順）を入れ替える。
+
+    入力値は衣装 index をキーに引き継ぐので、並び替えても入力は動かない。
+    """
+    trigger = ctx.triggered_id
+    if not isinstance(trigger, dict) or not loaded:
+        raise PreventUpdate
+    # 行の再生成直後にもボタン追加で発火するため、実クリックのみ処理
+    if not (ctx.triggered and ctx.triggered[0]["value"]):
+        raise PreventUpdate
+    costumes = loaded.get("costumes") or []
+    order = _gs_normalize_order(order, len(costumes))
+    ci = trigger["index"]
+    if ci not in order:
+        raise PreventUpdate
+    pos = order.index(ci)
+    new_pos = pos - 1 if trigger["type"] == "gs-move-up" else pos + 1
+    if not 0 <= new_pos < len(order):
+        raise PreventUpdate
+    order[pos], order[new_pos] = order[new_pos], order[pos]
+    return (
+        _gs_costume_rows(
+            costumes,
+            rank_by_index=_values_by_index(rank_values, rank_ids),
+            remain_by_index=_values_by_index(remain_values, remain_ids),
+            order=order,
+        ),
+        order,
     )
 
 
@@ -818,6 +962,7 @@ def _gs_build_gift_inputs(
     State({"type": "gs-bond-rank", "index": ALL}, "id"),
     State({"type": "gs-bond-remain", "index": ALL}, "value"),
     State({"type": "gs-bond-remain", "index": ALL}, "id"),
+    State("gs-costume-order", "data"),
     prevent_initial_call=True,
 )
 def gs_calculate(
@@ -831,8 +976,13 @@ def gs_calculate(
     rank_ids,
     remain_values,
     remain_ids,
+    order,
 ):
-    """MILP(SCIP) で贈り物配分を最適化し、マトリクスを表示する。"""
+    """MILP(SCIP) で贈り物配分を最適化し、マトリクスを表示する。
+
+    衣装の表示順がそのまま優先順位で、絆ボーナス合計・使用個数が同点なら
+    順位が上の衣装の絆ランクが高くなる配分を選ぶ（タイブレーク）。
+    """
     if not loaded:
         return html.Span("先にプリセットを読み込んでください。", style={"color": "red"})
 
@@ -859,6 +1009,12 @@ def gs_calculate(
 
     bond_bonuses = [c["bond_bonuses"] for c in costumes]
 
+    # 表示順（上が最優先）を 1 始まりの優先順位に変換する
+    order = _gs_normalize_order(order, len(costumes))
+    priorities = [0] * len(costumes)
+    for pos, ci in enumerate(order):
+        priorities[ci] = pos + 1
+
     try:
         result = solve_gift_distribution(
             current_ranks,
@@ -866,6 +1022,7 @@ def gs_calculate(
             gift_qty,
             value,
             remaining_exp=remaining_exp,
+            costume_priorities=priorities,
         )
     except Exception as e:
         return html.Span(f"計算エラー: {e}", style={"color": "red"})
@@ -879,17 +1036,24 @@ def gs_calculate(
 
     alloc = result["allocation"]
     n_ind = len(individual_gifts)
-    other_normal_alloc = (
-        list(alloc[pool_idx_normal]) if pool_idx_normal is not None else None
-    )
-    other_high_alloc = list(alloc[pool_idx_high]) if pool_idx_high is not None else None
 
-    col_names = [c["costume_name"] for c in costumes]
+    # 列は入力と同じ優先順位（上の行 = 左の列）で並べる
+    def _cols(row):
+        return [row[ci] for ci in order]
+
+    other_normal_alloc = (
+        _cols(alloc[pool_idx_normal]) if pool_idx_normal is not None else None
+    )
+    other_high_alloc = (
+        _cols(alloc[pool_idx_high]) if pool_idx_high is not None else None
+    )
+
+    col_names = [costumes[ci]["costume_name"] for ci in order]
     table = _gs_result_table(
         col_names,
         individual_gifts,
-        alloc[:n_ind],
-        result["final_ranks"],
+        [_cols(row) for row in alloc[:n_ind]],
+        _cols(result["final_ranks"]),
         other_normal_alloc,
         other_high_alloc,
     )
@@ -956,15 +1120,6 @@ def _rb_costume_rows(entries: list[dict], ranks=None, remains=None, targets=None
     remains = remains or {}
     targets = targets or {}
     n = len(entries)
-    move_btn_style = {
-        "background": "none",
-        "border": "1px solid #ccc",
-        "borderRadius": "4px",
-        "cursor": "pointer",
-        "padding": "2px 8px",
-        "fontSize": "0.8rem",
-        "lineHeight": "1",
-    }
     rows = []
     for i, e in enumerate(entries):
         rows.append(
@@ -986,7 +1141,7 @@ def _rb_costume_rows(entries: list[dict], ranks=None, remains=None, targets=None
                         n_clicks=0,
                         disabled=i == 0,
                         title="優先順位を上げる",
-                        style=move_btn_style,
+                        style=_MOVE_BTN_STYLE,
                     ),
                     html.Button(
                         "▼",
@@ -994,7 +1149,7 @@ def _rb_costume_rows(entries: list[dict], ranks=None, remains=None, targets=None
                         n_clicks=0,
                         disabled=i == n - 1,
                         title="優先順位を下げる",
-                        style=move_btn_style,
+                        style=_MOVE_BTN_STYLE,
                     ),
                     html.Strong(
                         e["label"],
@@ -1081,7 +1236,7 @@ def _rb_swap_indices(by_index: dict[int, object], i: int, j: int) -> dict[int, o
     return out
 
 
-def _rb_values_by_index(values, ids) -> dict[int, object]:
+def _values_by_index(values, ids) -> dict[int, object]:
     """パターンマッチ入力を {index: 値} にまとめる（None は除外）。"""
     return {vid["index"]: v for v, vid in zip(values, ids) if v is not None}
 
@@ -1166,9 +1321,9 @@ def rb_update_costumes(
     """
     trigger = ctx.triggered_id
     entries = list(entries or [])
-    ranks = _rb_values_by_index(rank_values, rank_ids)
-    remains = _rb_values_by_index(remain_values, remain_ids)
-    targets = _rb_values_by_index(target_values, target_ids)
+    ranks = _values_by_index(rank_values, rank_ids)
+    remains = _values_by_index(remain_values, remain_ids)
+    targets = _values_by_index(target_values, target_ids)
 
     def _rebuild_gift_list(old_entries):
         catalog = load_gifts()
@@ -1525,13 +1680,13 @@ def rb_save_autosave(
     return {
         "entries": entries or [],
         "ranks": {
-            str(k): v for k, v in _rb_values_by_index(rank_values, rank_ids).items()
+            str(k): v for k, v in _values_by_index(rank_values, rank_ids).items()
         },
         "remain": {
-            str(k): v for k, v in _rb_values_by_index(remain_values, remain_ids).items()
+            str(k): v for k, v in _values_by_index(remain_values, remain_ids).items()
         },
         "targets": {
-            str(k): v for k, v in _rb_values_by_index(target_values, target_ids).items()
+            str(k): v for k, v in _values_by_index(target_values, target_ids).items()
         },
         "qty": qty,
         "use": use,
