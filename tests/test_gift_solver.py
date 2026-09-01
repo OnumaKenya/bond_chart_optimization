@@ -1,6 +1,7 @@
 """gift_solver のテスト。
 
-exp_to_reach_rank / bonus_gain / solve_required_boxes を検証する。
+exp_to_reach_rank / bonus_gain / solve_gift_distribution /
+solve_required_boxes を検証する。
 """
 
 import pytest
@@ -9,6 +10,7 @@ from app.backend.gift_solver import (
     exp_to_reach_rank,
     bonus_gain,
     boxes_to_reach_rank,
+    solve_gift_distribution,
     solve_required_boxes,
 )
 
@@ -110,10 +112,140 @@ class TestBonusGain:
 
 
 # ---------------------------------------------------------------------------
-# solve_required_boxes
+# solve_gift_distribution
 # ---------------------------------------------------------------------------
 
 BONUS_FIRST = [1, 0, 0, 0, 0, 0, 0]  # 区間1（絆2~5）のみ +1
+
+
+def _distribute(current_ranks, bond_bonuses, *, gifts=None, **kwargs):
+    """gifts: (qty, value行) のリスト。省略時は所持贈り物なし。"""
+    gifts = gifts or []
+    gift_qty = [q for q, _ in gifts]
+    value = [v for _, v in gifts]
+    return solve_gift_distribution(
+        current_ranks, bond_bonuses, gift_qty, value, **kwargs
+    )
+
+
+class TestSolveGiftDistribution:
+    def test_single_costume(self):
+        # 20 EXP ×3 = 60 EXP。1 -> 3 に 15+30=45 EXP（絆4 は 75 EXP で届かず）
+        result = _distribute([1], [BONUS_FIRST], gifts=[(3, [20])])
+        assert result["status"] == "optimal"
+        assert result["total_gain"] == 2
+        assert result["final_ranks"] == [3]
+
+    def test_surplus_gift_is_kept(self):
+        # 絆5 到達済みなのでこれ以上ボーナスは増えない -> 1個も配らない
+        result = _distribute([5], [BONUS_FIRST], gifts=[(3, [20])])
+        assert result["status"] == "optimal"
+        assert result["total_gain"] == 0
+        assert result["allocation"][0] == [0]
+
+    def test_shared_gift_maximizes_total(self):
+        # 15 EXP ×1 はどちらか片方の 1 -> 2 にしか使えない
+        result = _distribute([1, 1], [BONUS_FIRST, BONUS_FIRST], gifts=[(1, [15, 15])])
+        assert result["status"] == "optimal"
+        assert result["total_gain"] == 1
+        assert sum(result["allocation"][0]) == 1
+
+    def test_remaining_exp_helps_rankup(self):
+        # 残り 5 EXP なら 20 EXP ×1 で 1 -> 2
+        result = _distribute([1], [BONUS_FIRST], gifts=[(1, [20])], remaining_exp=[5])
+        assert result["status"] == "optimal"
+        assert result["final_ranks"] == [2]
+
+
+class TestSolveGiftDistributionPriorities:
+    """costume_priorities（同点時のタイブレーク）。"""
+
+    def test_priority_costume_gets_shared_gift(self):
+        # 両衣装とも 1 -> 2 (15 EXP)。15 EXP ×1 はどちらに配っても +1 で同点。
+        # 順位が上（=1）の衣装2に寄せる。
+        result = _distribute(
+            [1, 1],
+            [BONUS_FIRST, BONUS_FIRST],
+            gifts=[(1, [15, 15])],
+            costume_priorities=[2, 1],
+        )
+        assert result["status"] == "optimal"
+        assert result["total_gain"] == 1
+        assert result["allocation"][0] == [0, 1]
+        assert result["final_ranks"] == [1, 2]
+
+    def test_lexicographic_order(self):
+        # 3衣装とも 1 -> 2 (15 EXP)、15 EXP ×2 は2衣装分にしか足りない。
+        # 順位 [3, 1, 2] なら衣装2・3に寄る。
+        result = _distribute(
+            [1, 1, 1],
+            [BONUS_FIRST] * 3,
+            gifts=[(2, [15, 15, 15])],
+            costume_priorities=[3, 1, 2],
+        )
+        assert result["status"] == "optimal"
+        assert result["total_gain"] == 2
+        assert result["allocation"][0] == [0, 1, 1]
+
+    def test_total_gain_never_decreases(self):
+        # 衣装1のみ 20 EXP、衣装2は 0 EXP の贈り物。衣装2を最優先にしても
+        # ボーナスを捨てる（配らない）解は選ばれない。
+        result = _distribute(
+            [1, 1],
+            [BONUS_FIRST, BONUS_FIRST],
+            gifts=[(1, [20, 0])],
+            costume_priorities=[2, 1],
+        )
+        assert result["status"] == "optimal"
+        assert result["total_gain"] == 1
+        assert result["allocation"][0] == [1, 0]
+
+    def test_surplus_gifts_are_not_wasted(self):
+        # 衣装1は絆5到達済み（これ以上ボーナスなし）、衣装2は絆1。
+        # 衣装1を最優先にしても、使用個数の最小化が先なので
+        # ボーナスに寄与しない余りは衣装1に配られない。
+        # 衣装2は 1 -> 5 (110 EXP) に 20 EXP ×6 で +4。
+        result = _distribute(
+            [5, 1],
+            [BONUS_FIRST, BONUS_FIRST],
+            gifts=[(10, [20, 20])],
+            costume_priorities=[1, 2],
+        )
+        assert result["status"] == "optimal"
+        assert result["total_gain"] == 4
+        assert result["allocation"][0] == [0, 6]
+
+    def test_unspecified_priority_is_not_a_tiebreak_target(self):
+        # 順位未指定（None）はタイブレーク対象外。指定のある衣装2に寄る。
+        result = _distribute(
+            [1, 1],
+            [BONUS_FIRST, BONUS_FIRST],
+            gifts=[(1, [15, 15])],
+            costume_priorities=[None, 1],
+        )
+        assert result["status"] == "optimal"
+        assert result["allocation"][0] == [0, 1]
+
+    def test_uniform_priorities_match_default(self):
+        kwargs = dict(gifts=[(3, [20, 20])])
+        base = _distribute([1, 1], [BONUS_FIRST] * 2, **kwargs)
+        same = _distribute(
+            [1, 1], [BONUS_FIRST] * 2, costume_priorities=[1, 1], **kwargs
+        )
+        assert same["status"] == "optimal"
+        assert same["total_gain"] == base["total_gain"]
+        assert same["final_ranks"] == base["final_ranks"]
+
+    def test_no_gifts_with_priorities(self):
+        result = _distribute([1, 1], [BONUS_FIRST] * 2, costume_priorities=[1, 2])
+        assert result["status"] == "optimal"
+        assert result["total_gain"] == 0
+        assert result["final_ranks"] == [1, 1]
+
+
+# ---------------------------------------------------------------------------
+# solve_required_boxes
+# ---------------------------------------------------------------------------
 
 
 def _solve(current_ranks, bond_bonuses, box_values, *, gifts=None, **kwargs):

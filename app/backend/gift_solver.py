@@ -99,6 +99,37 @@ def bonus_gain(bond_bonuses: list[int], from_rank: int, to_rank: int) -> int:
     )
 
 
+def _priority_groups(
+    priorities: list[int | None] | None, n: int
+) -> tuple[list[list[int]], bool]:
+    """優先順位リストを順位ごとの衣装グループ（上位から順）に正規化する。
+
+    priorities[c] は 1 が最優先で、同値は同順位（同じグループ）。None・不正値・
+    1 未満は「順位未指定」として最後のグループにまとめる。
+
+    Returns
+    -------
+    (groups, has_unspecified)
+        groups : 順位が上のグループから並んだ衣装 index のリスト。
+        has_unspecified : 末尾のグループが「順位未指定」かどうか。
+    """
+    prio: list[int | None] = []
+    for c in range(n):
+        try:
+            r = int(priorities[c]) if priorities is not None else None
+        except (TypeError, ValueError, IndexError):
+            r = None
+        prio.append(r if r is not None and r >= 1 else None)
+    groups = [
+        [c for c in range(n) if prio[c] == r]
+        for r in sorted({r for r in prio if r is not None})
+    ]
+    has_unspecified = any(r is None for r in prio)
+    if has_unspecified:
+        groups.append([c for c in range(n) if prio[c] is None])
+    return groups, has_unspecified
+
+
 def solve_gift_distribution(
     current_ranks: list[int],
     bond_bonuses: list[list[int]],
@@ -106,6 +137,7 @@ def solve_gift_distribution(
     value: list[list[int]],
     time_limit: float = DEFAULT_TIME_LIMIT,
     remaining_exp: list[int | None] | None = None,
+    costume_priorities: list[int | None] | None = None,
 ) -> dict:
     """贈り物配分 MILP を解く。
 
@@ -127,6 +159,14 @@ def solve_gift_distribution(
         （途中まで経験値が貯まっているケース）。None / 該当要素が
         None・0以下 の場合は通常どおりレベル満額を要求する。値は
         [1, 満額] にクランプする。
+    costume_priorities : list[int | None] | None
+        衣装ごとの優先順位（1 が最優先、同値は同順位）。絆ボーナス合計が
+        最大かつ使用贈り物数が最小である解が複数ある場合のタイブレークに
+        使う。順位が上のグループほど絆ランクの合計が高い解を辞書式に選ぶ
+        （= 同コストなら優先度の高い衣装に絆経験値が寄る）。使用贈り物数は
+        増えないので、余った贈り物が無駄に配られることはない。None・不正値・
+        1 未満は「順位未指定」でタイブレーク対象外。全衣装が同順位（または
+        未指定）なら従来どおり 1 回の求解。
 
     Returns
     -------
@@ -196,27 +236,88 @@ def solve_gift_distribution(
     )
     used_term = quicksum(x[g, c] for g in range(m) for c in range(n))
     weight = sum(max(0, int(q)) for q in gift_qty) + 1
-    model.setObjective(weight * bonus_term - used_term, "maximize")
+    main_term = weight * bonus_term - used_term
 
-    model.optimize()
-    status = model.getStatus()
+    # タイブレーク用: 順位ごとの「獲得ランク数の合計」。順位未指定の
+    # グループ（末尾）はタイブレークに使わない。
+    groups, has_unspecified = _priority_groups(costume_priorities, n)
+    ranked_groups = groups[:-1] if has_unspecified else groups
+    rank_terms = [
+        quicksum(
+            delta[c, r] for c in grp for r in range(current_ranks[c] + 1, _MAX_RANK + 1)
+        )
+        for grp in ranked_groups
+    ]
+
+    def _extract():
+        sol = model.getBestSol()
+        al = [
+            [int(round(model.getSolVal(sol, x[g, c]))) for c in range(n)]
+            for g in range(m)
+        ]
+        fr = []
+        for c in range(n):
+            r0 = current_ranks[c]
+            cnt = sum(
+                1
+                for r in range(r0 + 1, _MAX_RANK + 1)
+                if model.getSolVal(sol, delta[c, r]) > 0.5
+            )
+            fr.append(r0 + cnt)
+        return al, fr
+
+    snapshot = None
+    statuses = []
+
+    if len(groups) <= 1:
+        # 優先順位の指定なし（全衣装が同順位 or 全て未指定）:
+        # タイブレークの余地がないので従来どおり1回の求解。
+        model.setObjective(main_term, "maximize")
+        model.optimize()
+        statuses.append(model.getStatus())
+        if model.getNSols() > 0:
+            snapshot = _extract()
+    else:
+        # 辞書式最適化: 主目的（ボーナス最大 → 使用数最小）を制約として
+        # 固定したうえで、順位が上のグループから獲得ランク数を最大化する。
+        # time_limit は全段の合計に対する制限として扱う。
+        deadline = monotonic() + time_limit
+
+        def _optimize():
+            model.setParam("limits/time", max(0.1, deadline - monotonic()))
+            model.optimize()
+            statuses.append(model.getStatus())
+            return model.getNSols() > 0
+
+        model.setObjective(main_term, "maximize")
+        if _optimize():
+            snapshot = _extract()
+            bound = int(round(model.getObjVal()))
+            model.freeTransform()
+            model.addCons(main_term >= bound)
+            for term in rank_terms:
+                model.setObjective(term, "maximize")
+                if not _optimize():
+                    break
+                snapshot = _extract()
+                grp_bound = int(round(model.getObjVal()))
+                model.freeTransform()
+                model.addCons(term >= grp_bound)
+
+    if all(s == "optimal" for s in statuses):
+        status = "optimal"
+    elif snapshot is not None:
+        # 途中で時間制限等に達した場合は暫定解として扱う
+        status = "timelimit"
+    else:
+        status = statuses[0]
 
     allocation = [[0] * n for _ in range(m)]
     final_ranks = list(current_ranks)
     total_gain = 0
 
-    if model.getNSols() > 0:
-        sol = model.getBestSol()
-        for g in range(m):
-            for c in range(n):
-                allocation[g][c] = int(round(model.getSolVal(sol, x[g, c])))
-        for c in range(n):
-            r0 = current_ranks[c]
-            cnt = 0
-            for r in range(r0 + 1, _MAX_RANK + 1):
-                if model.getSolVal(sol, delta[c, r]) > 0.5:
-                    cnt += 1
-            final_ranks[c] = r0 + cnt
+    if snapshot is not None:
+        allocation, final_ranks = snapshot
         # 目的値は重み付き式なので、絆ボーナス上昇量は実ランクから再計算
         total_gain = sum(
             _range_bonus(bond_bonuses[c], r)
@@ -289,20 +390,7 @@ def solve_required_boxes(
     if target_ranks is None:
         target_ranks = [None] * n
     # 優先順位を正規化し、順位ごとの衣装グループ（上位から順）を作る。
-    # 未指定（None・不正値・1未満）は最後のグループにまとめる。
-    prio: list[int | None] = []
-    for c in range(n):
-        try:
-            r = int(box_priorities[c]) if box_priorities is not None else None
-        except (TypeError, ValueError, IndexError):
-            r = None
-        prio.append(r if r is not None and r >= 1 else None)
-    groups = [
-        [c for c in range(n) if prio[c] == r]
-        for r in sorted({r for r in prio if r is not None})
-    ]
-    if any(r is None for r in prio):
-        groups.append([c for c in range(n) if prio[c] is None])
+    groups, _ = _priority_groups(box_priorities, n)
     has_rank_target = any(
         t is not None and t > current_ranks[c] for c, t in enumerate(target_ranks)
     )
